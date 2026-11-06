@@ -23,3 +23,15 @@ export function intlPhone(phone: string) {
 export const waLinkTo = (phone: string, text: string) => `https://wa.me/${intlPhone(phone)}?text=${encodeURIComponent(text)}`;
 export const approvalMessage = (clinic: string, url: string) =>
   `مرحباً ${clinic}، تمت الموافقة على حسابك في Dentist On. يمكنك الآن تسجيل الدخول وإكمال طلبك من السلة: ${url}`;
+
+export function statusMessage(name: string, ref: string, status: string) {
+  const r = `#${ref.slice(0, 8).toUpperCase()}`;
+  const body: Record<string, string> = {
+    "جديد": `استلمنا طلبك ${r} وسنؤكده قريباً.`,
+    "قيد التجهيز": `طلبك ${r} قيد التجهيز الآن.`,
+    "تم الشحن": `تم شحن طلبك ${r} وهو في الطريق إليك.`,
+    "مكتمل": `تم إكمال طلبك ${r}. شكراً لثقتك بـ Dentist On.`,
+    "ملغي": `تم إلغاء طلبك ${r}. للاستفسار تواصل معنا.`,
+  };
+  return `مرحباً ${name}، ${body[status] ?? `حالة طلبك ${r}: ${status}`}`;
+}
