@@ -19,7 +19,7 @@ export const Route = createFileRoute("/cart")({
 function CartPage() {
   const { cart, set, clear } = useCart();
   const [done, setDone] = useState(false);
-  const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] }));
+  const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] ?? 0 }));
   const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty) * qty, 0);
 
   if (done) return (
