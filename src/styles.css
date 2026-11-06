@@ -205,3 +205,11 @@
     transition-duration: 1ms;
   }
 }
+.intro-splash:is([data-stage="3"], [data-stage="4"]) .intro-bulb {
+  filter: drop-shadow(0 0 10px var(--intro-green)) drop-shadow(0 0 28px var(--intro-green));
+  animation: intro-glow 1.6s ease-in-out infinite alternate;
+}
+@keyframes intro-glow {
+  from { filter: drop-shadow(0 0 8px var(--intro-green)) drop-shadow(0 0 20px var(--intro-green)); }
+  to { filter: drop-shadow(0 0 14px var(--intro-green)) drop-shadow(0 0 40px var(--intro-green)); }
+}
