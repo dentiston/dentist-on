@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Search, Truck, BadgePercent, ShieldCheck } from "lucide-react";
 import hero from "@/assets/hero.jpg";
-import { categories, products } from "@/lib/products";
+import { categories, useProducts } from "@/lib/products";
 import { ProductCard } from "@/components/ProductCard";
 
 export const Route = createFileRoute("/")({
@@ -20,6 +20,7 @@ export const Route = createFileRoute("/")({
 function Index() {
   const [cat, setCat] = useState("الكل");
   const [q, setQ] = useState("");
+  const { data: products = [], isLoading } = useProducts();
   const list = products.filter((p) => (cat === "الكل" || p.category === cat) && p.name.includes(q));
   return (
     <main>
@@ -64,7 +65,7 @@ function Index() {
         <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           {list.map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
-        {list.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد نتائج</p>}
+        {!isLoading && list.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد نتائج</p>}
       </section>
     </main>
   );
