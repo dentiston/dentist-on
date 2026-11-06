@@ -14,6 +14,7 @@ export type Product = {
   image: string;
   description: string;
   active: boolean;
+  stock?: number | null;
 };
 
 export const categories = ["الكل", "أدوات يدوية", "مواد ترميمية", "قبضات وأجهزة", "تعقيم ووقاية"];
@@ -31,4 +32,5 @@ export const productsQuery = {
 export const useProducts = () => useQuery(productsQuery);
 
 export const unitPrice = (p: Product, qty: number) => Number(qty >= 10 ? p.bulk_price : p.price);
+export const soldOut = (p: Product) => p.stock != null && p.stock <= 0;
 export const fmt = (n: number) => `$${Number(n).toFixed(2)}`;
