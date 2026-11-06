@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { CartProvider } from "@/lib/cart";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Toaster } from "@/components/ui/sonner";
+import { IntroSplash } from "@/components/IntroSplash";
 
 function NotFoundComponent() {
   return (
@@ -123,6 +124,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <CartProvider>
+        <IntroSplash />
         <SiteHeader />
         <Outlet />
         <footer className="mt-10 border-t border-border py-8 text-center text-sm text-muted-foreground">© Dentist On — For Dental Material</footer>
