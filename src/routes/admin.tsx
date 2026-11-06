@@ -6,6 +6,7 @@ import { Pencil, Trash2, Plus, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
 import { categories, fmt, imgSrc, useProducts, type Product } from "@/lib/products";
+import { fmtSyp, useRate } from "@/lib/rate";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -74,7 +75,7 @@ function Login() {
 }
 
 function Dashboard({ email }: { email: string }) {
-  const [tab, setTab] = useState<"orders" | "products">("orders");
+  const [tab, setTab] = useState<"orders" | "products" | "rate">("orders");
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -85,13 +86,13 @@ function Dashboard({ email }: { email: string }) {
         </div>
       </div>
       <div className="mt-6 flex gap-2">
-        {(["orders", "products"] as const).map((t) => (
+        {(["orders", "products", "rate"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-full px-5 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {t === "orders" ? "الطلبات" : "المنتجات"}
+            {({ orders: "الطلبات", products: "المنتجات", rate: "سعر الصرف" } as const)[t]}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders /> : <Products />}
+      {tab === "orders" ? <Orders /> : tab === "products" ? <Products /> : <RateSettings />}
     </main>
   );
 }
@@ -130,6 +131,11 @@ function Orders() {
               </div>
               <div className="text-left">
                 <div className="text-lg font-black">{fmt(Number(o.total))}</div>
+                {Number(o.total_syp) > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    {Math.round(Number(o.total_syp)).toLocaleString("en-US")} ل.س · <span dir="ltr">1$ = {Number(o.exchange_rate).toLocaleString("en-US")}</span>
+                  </div>
+                )}
                 <select
                   value={o.status}
                   onChange={async (e) => {
@@ -216,6 +222,53 @@ function Products() {
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function RateSettings() {
+  const qc = useQueryClient();
+  const { data } = useRate();
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const current = data?.rate ?? 0;
+  const n = Number(value);
+  return (
+    <section className="mt-6 max-w-md">
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="text-sm text-muted-foreground">سعر الصرف الحالي</div>
+        <div className="text-2xl font-black" dir="ltr">
+          {current > 0 ? `1 $ = ${current.toLocaleString("en-US")} ل.س` : "غير محدد"}
+        </div>
+        {current > 0 && data?.updatedAt && (
+          <div className="text-xs text-muted-foreground">آخر تحديث: {new Date(data.updatedAt).toLocaleString("ar")}</div>
+        )}
+        {current === 0 && <div className="mt-1 text-xs text-destructive">حتى تحدده، يرى الزبائن الأسعار بالدولار فقط.</div>}
+      </div>
+      <form
+        className="mt-4 space-y-3"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (!Number.isFinite(n) || n <= 0) { toast.error("أدخل رقمًا أكبر من صفر"); return; }
+          setBusy(true);
+          const { error } = await supabase.from("store_settings").upsert({ key: "usd_to_syp", value: n });
+          setBusy(false);
+          if (error) { toast.error(error.message); return; }
+          toast.success("تم تحديث سعر الصرف");
+          setValue("");
+          qc.invalidateQueries({ queryKey: ["usd_to_syp"] });
+        }}
+      >
+        <label className="block text-sm">
+          سعر الدولار اليوم (ليرة سورية)
+          <input type="number" step="any" min="0" required value={value} onChange={(e) => setValue(e.target.value)} className={input} dir="ltr" placeholder="0" />
+        </label>
+        {n > 0 && <p className="text-sm text-muted-foreground">معاينة: 10$ = {fmtSyp(10, n)}</p>}
+        <button disabled={busy} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">
+          {busy ? "جارِ الحفظ…" : "تحديث سعر الصرف"}
+        </button>
+        <p className="text-xs text-muted-foreground">الطلبات الجديدة تُسجَّل بسعر الصرف وقت الطلب، والقديمة لا تتغير.</p>
+      </form>
     </section>
   );
 }
