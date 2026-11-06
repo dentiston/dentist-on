@@ -28,3 +28,5 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Keep the opening animation in IntroSplash with stage-based CSS transitions; the light state follows completion of the vertical knob movement.

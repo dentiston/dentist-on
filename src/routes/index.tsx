@@ -12,6 +12,8 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "تسوّق المواد والأدوات السنية لعيادتك بأسعار الجملة وتوصيل سريع." },
       { property: "og:title", content: "Dentist On — متجر المواد والأدوات السنية" },
       { property: "og:description", content: "مواد ترميمية، أدوات يدوية، قبضات وأجهزة بأسعار جملة للعيادات." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Index,

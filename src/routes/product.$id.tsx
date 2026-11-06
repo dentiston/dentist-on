@@ -11,6 +11,8 @@ export const Route = createFileRoute("/product/$id")({
       { name: "description", content: "تفاصيل المنتج وأسعار الجملة في Dentist On." },
       { property: "og:title", content: "تفاصيل المنتج | Dentist On" },
       { property: "og:description", content: "تفاصيل المنتج وأسعار الجملة." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ProductPage,
