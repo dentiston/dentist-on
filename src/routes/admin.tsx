@@ -7,7 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
 import { categories, fmt, imgSrc, useProducts, type Product } from "@/lib/products";
 import { fmtSyp, useRate } from "@/lib/rate";
-import { approvalMessage, waLinkTo } from "@/lib/store";
+import { approvalMessage, statusMessage, waLinkTo } from "@/lib/store";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
 
 export const Route = createFileRoute("/admin")({
@@ -140,14 +141,19 @@ function Orders() {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery(ordersQuery);
   const revenue = data.filter((o) => o.status !== "ملغي").reduce((s, o) => s + Number(o.total), 0);
+  const unpaid = data.filter((o) => o.status !== "ملغي" && !o.paid).reduce((s, o) => s + Number(o.total), 0);
+  const weeks = weeklyCounts(data);
   return (
     <section className="mt-6">
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="عدد الطلبات" value={String(data.length)} />
         <Stat label="طلبات جديدة" value={String(data.filter((o) => o.status === "جديد").length)} />
         <Stat label="إجمالي المبيعات" value={fmt(revenue)} />
+        <Stat label="مكتملة هذا الأسبوع" value={String(weeks[weeks.length - 1]?.n ?? 0)} />
+        <Stat label="مبالغ غير محصّلة" value={fmt(unpaid)} />
       </div>
       {isLoading && <p className="text-muted-foreground">جارِ التحميل…</p>}
+      <WeeklyChart data={weeks} />
       {!isLoading && data.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد طلبات بعد</p>}
       <div className="space-y-3">
         {data.map((o) => (
@@ -169,13 +175,26 @@ function Orders() {
                 <select
                   value={o.status}
                   onChange={async (e) => {
-                    const { error } = await supabase.from("orders").update({ status: e.target.value }).eq("id", o.id);
-                    if (error) toast.error("تعذر التحديث"); else qc.invalidateQueries({ queryKey: ["orders"] });
+                    const status = e.target.value;
+                    const { error } = await supabase.from("orders").update({ status }).eq("id", o.id);
+                    if (error) { toast.error("تعذر التحديث"); return; }
+                    qc.invalidateQueries({ queryKey: ["orders"] });
+                    toast.success("تم تحديث الحالة", {
+                      duration: 12000,
+                      action: { label: "أبلغ الزبون", onClick: () => window.open(waLinkTo(o.phone, statusMessage(o.customer_name, o.id, status)), "_blank") },
+                    });
                   }}
                   className="mt-1 rounded-lg border border-input bg-card px-2 py-1 text-sm"
                 >
                   {statuses.map((s) => <option key={s}>{s}</option>)}
                 </select>
+                <a href={waLinkTo(o.phone, statusMessage(o.customer_name, o.id, o.status))} target="_blank" rel="noreferrer" className="mt-1 block text-xs font-bold text-primary underline">رسالة واتساب للزبون</a>
+                <label className="mt-1 flex items-center gap-2 text-xs">
+                  <input type="checkbox" checked={!!o.paid} onChange={async (e) => {
+                    const { error } = await supabase.from("orders").update({ paid: e.target.checked }).eq("id", o.id);
+                    if (error) toast.error("تعذر التحديث"); else qc.invalidateQueries({ queryKey: ["orders"] });
+                  }} /> مدفوع
+                </label>
               </div>
             </div>
             <ul className="mt-3 space-y-1 border-t border-border pt-3 text-sm">
@@ -400,5 +419,41 @@ function NotifySettings() {
         </div>
       </div>
     </section>
+  );
+}
+
+type Wk = { label: string; n: number };
+// الأسبوع يبدأ السبت؛ آخر عنصر = الأسبوع الحالي
+function weeklyCounts(orders: { status: string; completed_at?: string | null }[], weeks = 8): Wk[] {
+  const start = (d: Date) => { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() - ((x.getDay() + 1) % 7)); return x; };
+  const cur = start(new Date());
+  const out: Wk[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const s = new Date(cur); s.setDate(s.getDate() - i * 7);
+    const e = new Date(s); e.setDate(e.getDate() + 7);
+    out.push({
+      label: `${s.getDate()}/${s.getMonth() + 1}`,
+      n: orders.filter((o) => o.status === "مكتمل" && o.completed_at && new Date(o.completed_at) >= s && new Date(o.completed_at) < e).length,
+    });
+  }
+  return out;
+}
+
+function WeeklyChart({ data }: { data: Wk[] }) {
+  return (
+    <div className="mb-4 rounded-2xl bg-secondary p-4">
+      <div className="text-sm text-muted-foreground">الطلبات المكتملة أسبوعياً (آخر 8 أسابيع)</div>
+      <div className="mt-2 h-44 w-full text-primary" dir="ltr">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="label" fontSize={12} />
+            <YAxis allowDecimals={false} fontSize={12} width={24} />
+            <Tooltip />
+            <Bar dataKey="n" name="مكتمل" fill="currentColor" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
   );
 }
