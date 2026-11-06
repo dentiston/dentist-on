@@ -1,33 +1,32 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { products, fmt, unitPrice } from "@/lib/products";
+import { useProducts, fmt, unitPrice, imgSrc } from "@/lib/products";
 import { useCart } from "@/lib/cart";
 
 export const Route = createFileRoute("/product/$id")({
-  loader: ({ params }) => {
-    const p = products.find((x) => x.id === params.id);
-    if (!p) throw notFound();
-    return p;
-  },
-  head: ({ loaderData }) => ({
+  head: () => ({
     meta: [
-      { title: loaderData ? `${loaderData.name} | Dentist On` : "Unavailable | Dentist On" },
-      { name: "description", content: loaderData?.description ?? "" },
-      { property: "og:title", content: loaderData?.name ?? "Dentist On" },
-      { property: "og:description", content: loaderData?.description ?? "" },
+      { title: "تفاصيل المنتج | Dentist On" },
+      { name: "description", content: "تفاصيل المنتج وأسعار الجملة في Dentist On." },
+      { property: "og:title", content: "تفاصيل المنتج | Dentist On" },
+      { property: "og:description", content: "تفاصيل المنتج وأسعار الجملة." },
     ],
   }),
   component: ProductPage,
 });
 
 function ProductPage() {
-  const p = Route.useLoaderData();
+  const { id } = Route.useParams();
+  const { data, isLoading } = useProducts();
+  const p = data?.find((x) => x.id === id);
   const { add } = useCart();
   const [qty, setQty] = useState(1);
+  if (isLoading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
+  if (!p) return <main className="py-20 text-center">المنتج غير موجود. <Link to="/" className="font-bold underline">العودة</Link></main>;
   return (
     <main className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-2">
-      <img src={p.image} alt={p.name} width={816} height={816} className="w-full rounded-3xl bg-muted object-cover" />
+      <img src={imgSrc(p.image)} alt={p.name} width={816} height={816} className="w-full rounded-3xl bg-muted object-cover" />
       <div>
         <Link to="/" className="text-sm text-muted-foreground">← {p.category}</Link>
         <div className="mt-3 text-sm font-semibold text-muted-foreground">{p.brand}</div>
@@ -35,7 +34,7 @@ function ProductPage() {
         <p className="mt-4 text-muted-foreground">{p.description}</p>
         <div className="mt-6 rounded-2xl bg-secondary p-4">
           <div className="flex justify-between"><span>سعر القطعة</span><b>{fmt(p.price)}</b></div>
-          <div className="flex justify-between"><span>سعر الجملة (10+)</span><b className="text-primary">{fmt(p.bulkPrice)}</b></div>
+          <div className="flex justify-between"><span>سعر الجملة (10+)</span><b className="text-primary">{fmt(p.bulk_price)}</b></div>
         </div>
         <div className="mt-6 flex items-center gap-3">
           <div className="flex items-center rounded-full border border-input">

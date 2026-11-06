@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { products, fmt, unitPrice } from "@/lib/products";
+import { useProducts, fmt, unitPrice, imgSrc } from "@/lib/products";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
 
 export const Route = createFileRoute("/cart")({
@@ -19,6 +21,8 @@ export const Route = createFileRoute("/cart")({
 function CartPage() {
   const { cart, set, clear } = useCart();
   const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const { data: products = [] } = useProducts();
   const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] ?? 0 }));
   const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty) * qty, 0);
 
@@ -40,7 +44,7 @@ function CartPage() {
           <div className="space-y-3">
             {items.map(({ p, qty }) => (
               <div key={p.id} className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
-                <img src={p.image} alt={p.name} loading="lazy" className="h-20 w-20 rounded-xl object-cover" />
+                <img src={imgSrc(p.image)} alt={p.name} loading="lazy" className="h-20 w-20 rounded-xl object-cover" />
                 <div className="flex-1">
                   <div className="font-bold leading-snug">{p.name}</div>
                   <div className="text-sm text-muted-foreground">{fmt(unitPrice(p, qty))} للقطعة {qty >= 10 && "· سعر جملة"}</div>
@@ -58,14 +62,25 @@ function CartPage() {
             ))}
           </div>
           <form
-            onSubmit={(e) => { e.preventDefault(); clear(); setDone(true); }}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              setBusy(true);
+              const { error } = await supabase.from("orders").insert({
+                customer_name: String(f.get("name")), phone: String(f.get("phone")), address: String(f.get("address")),
+                items: items.map(({ p, qty }) => ({ id: p.id, name: p.name, qty, unit: unitPrice(p, qty) })), total,
+              });
+              setBusy(false);
+              if (error) { toast.error("تعذر إرسال الطلب، حاول مجددًا"); return; }
+              clear(); setDone(true);
+            }}
             className="h-fit space-y-3 rounded-2xl bg-secondary p-5"
           >
             <div className="flex justify-between text-lg"><span>الإجمالي</span><b>{fmt(total)}</b></div>
-            <input required placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <input required type="tel" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <input required placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <button className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground">تأكيد الطلب</button>
+            <input name="name" required placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <input name="phone" required type="tel" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <input name="address" required placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <button disabled={busy} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
           </form>
         </div>
       )}
