@@ -401,6 +401,7 @@ function NotifySettings() {
           <button
             type="button"
             onClick={async () => {
+              if (!/^[A-Za-z0-9_-]{1,64}$/.test(topic)) { toast.error("الاسم: أحرف إنجليزية وأرقام و - و _ فقط، بلا مسافات"); return; }
               const { error } = await supabase.from("notify_settings").upsert({ key: "ntfy_topic", value: topic });
               if (error) { toast.error(error.message); return; }
               toast.success("تم الحفظ"); setEdited(null); qc.invalidateQueries({ queryKey: ["ntfy_topic"] });
@@ -411,8 +412,11 @@ function NotifySettings() {
             type="button"
             disabled={!topic}
             onClick={async () => {
-              try { await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, { method: "POST", body: "إشعار تجريبي من Dentist On" }); toast.success("أُرسل الإشعار التجريبي"); }
-              catch { toast.error("تعذر الإرسال"); }
+              try {
+                const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, { method: "POST", body: "إشعار تجريبي من Dentist On" });
+                if (!res.ok) { toast.error(`رفض ntfy الإرسال (${res.status}). استخدم أحرفاً إنجليزية وأرقاماً و - و _ فقط`); return; }
+                toast.success("أُرسل الإشعار التجريبي");
+              } catch { toast.error("تعذر الاتصال بـ ntfy"); }
             }}
             className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-foreground disabled:opacity-50"
           >إشعار تجريبي</button>
