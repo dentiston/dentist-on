@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { type Product, fmt, imgSrc } from "@/lib/products";
+import { type Product, imgSrc } from "@/lib/products";
+import { Price } from "@/components/Price";
 import { useCart } from "@/lib/cart";
 
 export function ProductCard({ p }: { p: Product }) {
@@ -16,8 +17,8 @@ export function ProductCard({ p }: { p: Product }) {
         <Link to="/product/$id" params={{ id: p.id }} className="line-clamp-2 font-bold leading-snug">{p.name}</Link>
         <div className="mt-auto flex items-end justify-between pt-3">
           <div>
-            <div className="text-lg font-black">{fmt(p.price)}</div>
-            <div className="text-xs text-muted-foreground">{fmt(p.bulk_price)} للجملة (10+)</div>
+            <Price usd={p.price} className="block text-lg font-black" />
+            <div className="text-xs text-muted-foreground"><Price usd={p.bulk_price} usdToo={false} /> للجملة (10+)</div>
           </div>
           <button
             onClick={() => { add(p.id); toast.success("أُضيف إلى السلة"); }}
