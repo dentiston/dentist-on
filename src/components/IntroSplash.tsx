@@ -7,8 +7,8 @@ export function IntroSplash() {
       setTimeout(() => setStage(1), 500),
       setTimeout(() => setStage(2), 1200),
       setTimeout(() => setStage(3), 2000),
-      setTimeout(() => setStage(4), 6000),
-      setTimeout(() => { setStage(5); }, 6800),
+      setTimeout(() => setStage(4), 4000),
+      setTimeout(() => { setStage(5); }, 4800),
     ];
     return () => ts.forEach(clearTimeout);
   }, []);
