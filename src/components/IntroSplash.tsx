@@ -29,7 +29,7 @@ export function IntroSplash() {
             strokeWidth="10"
             strokeLinecap="round"
           />
-        </div>
+        </svg>
         <div className="intro-switch">
           <div className="intro-switch-knob" />
         </div>
