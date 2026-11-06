@@ -24,6 +24,8 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-5 text-sm font-semibold">
           <Link to="/" className="hidden sm:inline hover:text-accent">المتجر</Link>
+          <Link to="/account" className="hover:text-accent">حسابي</Link>
+          <Link to="/track" className="hover:text-accent">تتبع طلبك</Link>
           {isAdmin && <Link to="/admin" className="hover:text-accent">المدير</Link>}
           <Link to="/cart" className="relative flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-primary-foreground">
             <ShoppingCart className="h-4 w-4" />
