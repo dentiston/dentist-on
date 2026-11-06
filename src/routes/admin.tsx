@@ -14,6 +14,8 @@ export const Route = createFileRoute("/admin")({
       { name: "description", content: "إدارة المنتجات والطلبات في Dentist On." },
       { property: "og:title", content: "لوحة المدير | Dentist On" },
       { property: "og:description", content: "إدارة المنتجات والطلبات." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { name: "robots", content: "noindex" },
     ],
   }),

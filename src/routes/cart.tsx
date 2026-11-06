@@ -13,6 +13,8 @@ export const Route = createFileRoute("/cart")({
       { name: "description", content: "راجع طلبك من المواد والأدوات السنية وأكمل الشراء." },
       { property: "og:title", content: "سلة المشتريات | Dentist On" },
       { property: "og:description", content: "راجع طلبك وأكمل الشراء." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: CartPage,
