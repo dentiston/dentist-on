@@ -20,17 +20,18 @@ export function IntroSplash() {
       aria-hidden="true"
     >
       <div className="intro-mark flex flex-col items-center gap-7">
-        <svg viewBox="0 0 100 120" className="intro-bulb h-24 w-20">
-          <path
-            d="M40 105 v-12 c0 -8 -28 -18 -28 -45 a38 38 0 1 1 76 0 c0 20 -14 30 -30 30 c-14 0 -20 -10 -20 -20 a10 10 0 0 1 20 0 c0 12 -12 14 -18 8"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="10"
-            strokeLinecap="round"
-          />
-        </svg>
         <div className="intro-switch">
-          <div className="intro-switch-knob" />
+          <div className="intro-switch-knob grid place-items-center">
+            <svg viewBox="0 0 100 120" className="intro-bulb h-14 w-12">
+              <path
+                d="M40 105 v-12 c0 -8 -28 -18 -28 -45 a38 38 0 1 1 76 0 c0 20 -14 30 -30 30 c-14 0 -20 -10 -20 -20 a10 10 0 0 1 20 0 c0 12 -12 14 -18 8"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="10"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
         </div>
         <span className="intro-on text-5xl font-black">ON</span>
       </div>

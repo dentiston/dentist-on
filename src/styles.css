@@ -213,3 +213,5 @@
   from { filter: drop-shadow(0 0 8px var(--intro-green)) drop-shadow(0 0 20px var(--intro-green)); }
   to { filter: drop-shadow(0 0 14px var(--intro-green)) drop-shadow(0 0 40px var(--intro-green)); }
 }
+.intro-switch-knob .intro-bulb { opacity: 0.15; color: var(--intro-dark); filter: none; transition: opacity 450ms ease, color 450ms ease; }
+.intro-splash:is([data-stage="3"], [data-stage="4"]) .intro-switch-knob .intro-bulb { opacity: 1; color: var(--intro-green); }
