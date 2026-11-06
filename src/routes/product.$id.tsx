@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useProducts, unitPrice, imgSrc } from "@/lib/products";
+import { useProducts, unitPrice, imgSrc, soldOut } from "@/lib/products";
 import { Price } from "@/components/Price";
 import { useCart } from "@/lib/cart";
 
@@ -45,8 +45,8 @@ function ProductPage() {
             <span className="w-8 text-center font-bold">{qty}</span>
             <button className="px-4 py-2 text-lg" onClick={() => setQty(qty + 1)}>+</button>
           </div>
-          <button onClick={() => { add(p.id, qty); toast.success("أُضيف إلى السلة"); }} className="flex-1 rounded-full bg-primary py-3 font-bold text-primary-foreground">
-            أضف للسلة — <Price usd={unitPrice(p, qty) * qty} usdToo={false} />
+          <button disabled={soldOut(p)} onClick={() => { add(p.id, qty); toast.success("أُضيف إلى السلة"); }} className="flex-1 rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-50">
+            {soldOut(p) ? "نفد المخزون" : <>أضف للسلة — <Price usd={unitPrice(p, qty) * qty} usdToo={false} /></>}
           </button>
         </div>
       </div>

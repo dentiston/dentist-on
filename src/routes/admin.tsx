@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pencil, Trash2, Plus, LogOut } from "lucide-react";
@@ -7,6 +7,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
 import { categories, fmt, imgSrc, useProducts, type Product } from "@/lib/products";
 import { fmtSyp, useRate } from "@/lib/rate";
+import { approvalMessage, waLinkTo } from "@/lib/store";
+import type { Customer } from "@/lib/customer";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -75,7 +77,24 @@ function Login() {
 }
 
 function Dashboard({ email }: { email: string }) {
-  const [tab, setTab] = useState<"orders" | "products" | "rate">("orders");
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<"orders" | "customers" | "products" | "rate">("orders");
+  const { data: orders = [] } = useQuery(ordersQuery);
+  const { data: customers = [] } = useQuery(customersQuery);
+  const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : 0;
+  useEffect(() => {
+    const ch = supabase.channel("admin-alerts")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "customers" }, (p) => {
+        toast.info(`تسجيل جديد: ${(p.new as Customer).clinic_name || "عيادة"}`);
+        qc.invalidateQueries({ queryKey: ["customers"] });
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "orders" }, (p) => {
+        toast.info(`طلب جديد من ${(p.new as { customer_name: string }).customer_name}`);
+        qc.invalidateQueries({ queryKey: ["orders"] });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [qc]);
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -86,29 +105,40 @@ function Dashboard({ email }: { email: string }) {
         </div>
       </div>
       <div className="mt-6 flex gap-2">
-        {(["orders", "products", "rate"] as const).map((t) => (
+        {(["orders", "customers", "products", "rate"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-full px-5 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", products: "المنتجات", rate: "سعر الصرف" } as const)[t]}
+            {({ orders: "الطلبات", customers: "العملاء", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
+            {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders /> : tab === "products" ? <Products /> : <RateSettings />}
+      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "products" ? <Products /> : <><RateSettings /><NotifySettings /></>}
     </main>
   );
 }
+
+const ordersQuery = {
+  queryKey: ["orders"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+};
+const customersQuery = {
+  queryKey: ["customers"],
+  queryFn: async () => {
+    const { data, error } = await supabase.from("customers").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return data as Customer[];
+  },
+};
 
 const statuses = ["جديد", "قيد التجهيز", "تم الشحن", "مكتمل", "ملغي"];
 
 function Orders() {
   const qc = useQueryClient();
-  const { data = [], isLoading } = useQuery({
-    queryKey: ["orders"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("orders").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const { data = [], isLoading } = useQuery(ordersQuery);
   const revenue = data.filter((o) => o.status !== "ملغي").reduce((s, o) => s + Number(o.total), 0);
   return (
     <section className="mt-6">
@@ -164,7 +194,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-secondary p-4"><div className="text-sm text-muted-foreground">{label}</div><div className="text-2xl font-black">{value}</div></div>;
 }
 
-const empty: Product = { id: "", name: "", brand: "", category: "أدوات يدوية", price: 0, bulk_price: 0, image: "instruments", description: "", active: true };
+const empty: Product = { id: "", name: "", brand: "", category: "أدوات يدوية", price: 0, bulk_price: 0, image: "instruments", description: "", active: true, stock: null };
 
 function Products() {
   const qc = useQueryClient();
@@ -195,6 +225,15 @@ function Products() {
             {categories.slice(1).map((c) => <option key={c}>{c}</option>)}
           </select>
           <input placeholder="رابط الصورة (https://...)" value={edit.image} onChange={(e) => setEdit({ ...edit, image: e.target.value })} className={input} dir="ltr" />
+          <label className="text-sm">رفع صورة<input type="file" accept="image/*" className={input} onChange={async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            const path = `${crypto.randomUUID()}.${file.name.split(".").pop() ?? "jpg"}`;
+            const { error } = await supabase.storage.from("product-images").upload(path, file, { contentType: file.type });
+            if (error) { toast.error(error.message); return; }
+            setEdit({ ...edit, image: supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl });
+            toast.success("تم رفع الصورة");
+          }} /></label>
+          <label className="text-sm">المخزون (فارغ = غير محدود)<input type="number" min="0" value={edit.stock ?? ""} onChange={(e) => setEdit({ ...edit, stock: e.target.value === "" ? null : Number(e.target.value) })} className={input} /></label>
           <label className="text-sm">السعر<input type="number" step="0.01" min="0" required value={edit.price} onChange={(e) => setEdit({ ...edit, price: Number(e.target.value) })} className={input} /></label>
           <label className="text-sm">سعر الجملة (10+)<input type="number" step="0.01" min="0" required value={edit.bulk_price} onChange={(e) => setEdit({ ...edit, bulk_price: Number(e.target.value) })} className={input} /></label>
           <textarea placeholder="الوصف" value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} className={`${input} sm:col-span-2`} rows={3} />
@@ -211,7 +250,7 @@ function Products() {
             <img src={imgSrc(p.image)} alt="" className="h-14 w-14 rounded-xl object-cover" />
             <div className="flex-1">
               <div className="font-bold leading-snug">{p.name} {!p.active && <span className="text-xs text-muted-foreground">(مخفي)</span>}</div>
-              <div className="text-sm text-muted-foreground">{p.category} · {fmt(p.price)} / {fmt(p.bulk_price)}</div>
+              <div className="text-sm text-muted-foreground">{p.category} · {fmt(p.price)} / {fmt(p.bulk_price)} · {p.stock == null ? "مخزون غير محدود" : `المخزون: ${p.stock}`}</div>
             </div>
             <button aria-label="تعديل" onClick={() => { setEdit(p); setIsNew(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}><Pencil className="h-4 w-4" /></button>
             <button aria-label="حذف" className="text-destructive" onClick={async () => {
@@ -269,6 +308,97 @@ function RateSettings() {
         </button>
         <p className="text-xs text-muted-foreground">الطلبات الجديدة تُسجَّل بسعر الصرف وقت الطلب، والقديمة لا تتغير.</p>
       </form>
+    </section>
+  );
+}
+
+function Customers() {
+  const qc = useQueryClient();
+  const { data = [], isLoading } = useQuery(customersQuery);
+  const label = { pending: "بانتظار الموافقة", approved: "مفعّل", rejected: "مرفوض" } as const;
+  const sorted = [...data].sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending"));
+  const setStatus = async (c: Customer, status: Customer["status"]) => {
+    const { error } = await supabase.from("customers").update({ status, approved_at: status === "approved" ? new Date().toISOString() : null }).eq("user_id", c.user_id);
+    if (error) { toast.error("تعذر التحديث"); return; }
+    qc.invalidateQueries({ queryKey: ["customers"] });
+    if (status === "approved")
+      toast.success("تمت الموافقة", {
+        duration: 15000,
+        action: { label: "أرسل واتساب", onClick: () => window.open(waLinkTo(c.phone, approvalMessage(c.clinic_name, `${window.location.origin}/cart`)), "_blank") },
+      });
+  };
+  return (
+    <section className="mt-6 space-y-3">
+      {isLoading && <p className="text-muted-foreground">جارِ التحميل…</p>}
+      {!isLoading && data.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد تسجيلات بعد</p>}
+      {sorted.map((c) => (
+        <div key={c.user_id} className="rounded-2xl border border-border bg-card p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <div className="font-bold">{c.clinic_name}</div>
+              <div className="text-sm text-muted-foreground" dir="ltr">{c.phone}</div>
+              <div className="text-sm text-muted-foreground">{c.address}</div>
+              <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString("ar")}</div>
+            </div>
+            <span className={`rounded-full px-3 py-1 text-xs font-bold ${c.status === "pending" ? "bg-accent text-accent-foreground" : "bg-muted"}`}>{label[c.status]}</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {c.status !== "approved" && <button onClick={() => setStatus(c, "approved")} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">موافقة</button>}
+            {c.status === "pending" && <button onClick={() => setStatus(c, "rejected")} className="rounded-full bg-muted px-5 py-2 text-sm">رفض</button>}
+            {c.status === "approved" && (
+              <a href={waLinkTo(c.phone, approvalMessage(c.clinic_name, `${window.location.origin}/cart`))} target="_blank" rel="noreferrer" className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-foreground">رسالة واتساب</a>
+            )}
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function NotifySettings() {
+  const qc = useQueryClient();
+  const { data: saved = "" } = useQuery({
+    queryKey: ["ntfy_topic"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("notify_settings").select("value").eq("key", "ntfy_topic").maybeSingle();
+      if (error) throw error;
+      return data?.value ?? "";
+    },
+  });
+  const [edited, setEdited] = useState<string | null>(null);
+  const topic = (edited ?? saved).trim();
+  const gen = () => {
+    const b = crypto.getRandomValues(new Uint8Array(9));
+    setEdited("dentist-on-" + Array.from(b, (x) => x.toString(36).padStart(2, "0")).join("").slice(0, 14));
+  };
+  return (
+    <section className="mt-8 max-w-md">
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">إشعارات على هاتفك</div>
+        <p className="mt-1 text-xs text-muted-foreground">ثبّت تطبيق ntfy واشترك بنفس الاسم أدناه لتصلك إشعارات التسجيلات والطلبات حتى والموقع مغلق. اختر اسماً طويلاً عشوائياً ولا تشاركه.</p>
+        <input value={edited ?? saved} onChange={(e) => setEdited(e.target.value)} dir="ltr" placeholder="اسم الموضوع" className={`${input} mt-3`} />
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={gen} className="rounded-full bg-muted px-4 py-2 text-sm">توليد اسم</button>
+          <button
+            type="button"
+            onClick={async () => {
+              const { error } = await supabase.from("notify_settings").upsert({ key: "ntfy_topic", value: topic });
+              if (error) { toast.error(error.message); return; }
+              toast.success("تم الحفظ"); setEdited(null); qc.invalidateQueries({ queryKey: ["ntfy_topic"] });
+            }}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground"
+          >حفظ</button>
+          <button
+            type="button"
+            disabled={!topic}
+            onClick={async () => {
+              try { await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, { method: "POST", body: "إشعار تجريبي من Dentist On" }); toast.success("أُرسل الإشعار التجريبي"); }
+              catch { toast.error("تعذر الإرسال"); }
+            }}
+            className="rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-foreground disabled:opacity-50"
+          >إشعار تجريبي</button>
+        </div>
+      </div>
     </section>
   );
 }

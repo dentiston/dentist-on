@@ -6,6 +6,9 @@ import { Price } from "@/components/Price";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
+import { useCustomer } from "@/lib/customer";
+import { WA_NUMBER, orderMessage, waLink } from "@/lib/store";
+import { fmt } from "@/lib/products";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -26,7 +29,10 @@ function CartPage() {
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
   const [orderId, setOrderId] = useState("");
+  const [waText, setWaText] = useState("");
   const { data: products = [] } = useProducts();
+  const { session, customer, loading: custLoading } = useCustomer();
+  const canOrder = customer?.status === "approved";
   const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] ?? 0 }));
   const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty) * qty, 0);
 
@@ -35,7 +41,11 @@ function CartPage() {
       <h1 className="text-3xl font-black">تم استلام طلبك ✓</h1>
       <p className="mt-3 text-muted-foreground">سنتواصل معك لتأكيد التوصيل.</p>
       {orderId && <p className="mt-2 text-sm text-muted-foreground">رقم الطلب: <b dir="ltr">{orderId.slice(0, 8).toUpperCase()}</b></p>}
-      <Link to="/" className="mt-6 inline-block rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground">متابعة التسوق</Link>
+      <p className="mt-2 text-sm text-muted-foreground">احتفظ بالرقم وبرقم هاتفك لتتبع الطلب من صفحة «تتبع طلبك».</p>
+      {WA_NUMBER && waText && (
+        <a href={waLink(waText)} target="_blank" rel="noreferrer" className="mt-6 block rounded-full bg-accent px-6 py-3 font-bold text-accent-foreground">أرسل تفاصيل الطلب عبر واتساب لتسريع التأكيد</a>
+      )}
+      <Link to="/" className="mt-3 inline-block rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground">متابعة التسوق</Link>
     </main>
   );
 
@@ -67,8 +77,10 @@ function CartPage() {
             ))}
           </div>
           <form
+            key={customer?.user_id ?? "guest"}
             onSubmit={async (e) => {
               e.preventDefault();
+              if (!canOrder) return;
               const f = new FormData(e.currentTarget);
               setBusy(true);
               // الخادم يعيد حساب الأسعار وسعر الصرف؛ نرسل فقط المعرّف والكمية
@@ -78,19 +90,28 @@ function CartPage() {
               });
               setBusy(false);
               if (error) {
-                toast.error(error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
+                toast.error(error.message.includes("account not approved") ? "حسابك بانتظار الموافقة" : error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
                 return;
               }
+              setWaText(orderMessage(String(id), String(f.get("name")), items.map(({ p, qty }) => ({ name: p.name, qty })), fmt(total)));
               setOrderId(String(id)); clear(); setDone(true);
             }}
             className="h-fit space-y-3 rounded-2xl bg-secondary p-5"
           >
             <div className="flex justify-between text-lg"><span>الإجمالي</span><b className="text-left"><Price usd={total} /></b></div>
-            <input name="name" required placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <input name="phone" required type="tel" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <input name="address" required placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            {!canOrder && !custLoading && (
+              <div className="rounded-xl bg-card p-3 text-sm">
+                {!session ? (
+                  <>جهّز سلتك الآن، ولإرسال الطلب سجّل حساب عيادتك. <Link to="/account" className="font-bold text-primary underline">تسجيل / دخول</Link></>
+                ) : customer?.status === "rejected" ? "تعذّر قبول حسابك. تواصل معنا لمعرفة السبب."
+                : "حسابك قيد المراجعة. جهّز سلتك، وسنراسلك على واتساب عند الموافقة لإكمال الطلب."}
+              </div>
+            )}
+            <input name="name" required defaultValue={customer?.clinic_name} placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <input name="phone" required defaultValue={customer?.phone} type="tel" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <input name="address" required defaultValue={customer?.address} placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <p className="text-xs text-muted-foreground">يُحتسب السعر النهائي بسعر الصرف لحظة تأكيد الطلب.</p>
-            <button disabled={busy} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
+            <button disabled={busy || !canOrder} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
           </form>
         </div>
       )}
