@@ -54,7 +54,7 @@ function Login() {
             ? await supabase.auth.signInWithPassword({ email, password })
             : await supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/admin` } });
           setBusy(false);
-          if (error) return toast.error(error.message);
+          if (error) { toast.error(error.message); return; }
           if (mode === "up" && !data.session) toast.success("تحقق من بريدك الإلكتروني لتأكيد الحساب");
         }}
       >
@@ -177,7 +177,7 @@ function Products() {
             e.preventDefault();
             const row = { ...edit, id: isNew ? edit.id || crypto.randomUUID().slice(0, 8) : edit.id };
             const { error } = isNew ? await supabase.from("products").insert(row) : await supabase.from("products").update(row).eq("id", edit.id);
-            if (error) return toast.error(error.message);
+            if (error) { toast.error(error.message); return; }
             toast.success("تم الحفظ"); setEdit(null); refresh();
           }}
         >
