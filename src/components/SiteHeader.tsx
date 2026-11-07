@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ShoppingCart } from "lucide-react";
 import { Logo } from "@/components/Logo";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { useDark } from "@/lib/theme";
 import { useCart } from "@/lib/cart";
 import { useAdmin } from "@/lib/auth";
 import { useRate } from "@/lib/rate";
@@ -9,6 +9,7 @@ import { InstallButton } from "@/components/InstallButton";
 
 export function SiteHeader() {
   const { count } = useCart();
+  const { dark, toggle } = useDark();
   const { isAdmin, isStaff } = useAdmin();
   const { data: r } = useRate();
   const rate = r?.rate ?? 0;
@@ -21,7 +22,7 @@ export function SiteHeader() {
         </div>
       )}
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-2">
-        <Link to="/" className="flex items-center">
+        <Link to="/" onClick={toggle} aria-label={dark ? "الشعار: التبديل إلى الوضع الفاتح" : "الشعار: التبديل إلى الوضع الداكن"} className="flex items-center">
           <Logo className="h-12 sm:h-20 w-auto max-w-[50vw] object-contain" />
         </Link>
         <nav className="flex items-center gap-3 sm:gap-5 text-sm font-semibold">
@@ -29,7 +30,6 @@ export function SiteHeader() {
           <Link to="/account" className="hover:text-accent">حسابي</Link>
           {(isAdmin || isStaff) && <Link to="/admin" className="hover:text-accent">{isAdmin ? "المدير" : "الطلبات"}</Link>}
           <InstallButton />
-          <ThemeToggle />
           <Link to="/cart" aria-label="السلة" className="relative flex items-center gap-2 rounded-full bg-primary px-3 sm:px-4 py-2 text-primary-foreground">
             <ShoppingCart className="h-4 w-4" />
             <span className="hidden sm:inline">السلة</span>
