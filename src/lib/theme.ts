@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
-export const THEME_KEY = "theme";
-
-// يعمل قبل أول رسم للصفحة لمنع وميض الأبيض: يقرأ اختيار الزائر وإلا يتبع إعداد جهازه
-export const THEME_SCRIPT = `try{var t=localStorage.getItem("${THEME_KEY}");var d=t?t==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d)}catch(e){}`;
+// الموقع يبدأ دائماً بالوضع الفاتح؛ التبديل يتم بالضغط على الشعار ولا يُحفظ
+export const THEME_SCRIPT = `try{document.documentElement.classList.remove("dark");localStorage.removeItem("theme")}catch(e){}`;
 
 export function useDark() {
   const [dark, setDark] = useState(false);
@@ -14,21 +12,11 @@ export function useDark() {
     sync();
     const mo = new MutationObserver(sync);
     mo.observe(el, { attributes: true, attributeFilter: ["class"] });
-    // إن لم يختر الزائر يدوياً، نتبع تغيّر إعداد الجهاز
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onSystem = (e: MediaQueryListEvent) => {
-      try { if (localStorage.getItem(THEME_KEY)) return; } catch { /* ignore */ }
-      el.classList.toggle("dark", e.matches);
-    };
-    mq.addEventListener("change", onSystem);
-    return () => { mo.disconnect(); mq.removeEventListener("change", onSystem); };
+    return () => mo.disconnect();
   }, []);
 
   const toggle = useCallback(() => {
-    const el = document.documentElement;
-    const next = !el.classList.contains("dark");
-    el.classList.toggle("dark", next);
-    try { localStorage.setItem(THEME_KEY, next ? "dark" : "light"); } catch { /* ignore */ }
+    document.documentElement.classList.toggle("dark");
   }, []);
 
   return { dark, toggle };
