@@ -21,13 +21,13 @@ const num = (s: string) => Number(en(s).replace(/[,٬\s]/g, ""));
 
 function build(rows: string[][]): { ok: Product[]; errs: string[]; fatal?: string } {
   if (rows.length < 2) return { ok: [], errs: [], fatal: "الملف فارغ أو بلا صفوف بيانات" };
-  const head = rows[0].map((h) => h.trim().toLowerCase());
+  const head = (rows[0] ?? []).map((h) => h.trim().toLowerCase());
   const col: Record<string, number> = {};
   for (const [k, names] of Object.entries(ALIASES)) {
     const i = head.findIndex((h) => names.includes(h));
     if (i >= 0) col[k] = i;
   }
-  if (col.name === undefined || col.price === undefined) return { ok: [], errs: [], fatal: "يجب وجود عمودي «اسم المنتج» و«السعر» في الصف الأول" };
+  if (col["name"] === undefined || col["price"] === undefined) return { ok: [], errs: [], fatal: "يجب وجود عمودي «اسم المنتج» و«السعر» في الصف الأول" };
   const ok: Product[] = [];
   const errs: string[] = [];
   const seen = new Set<string>();
