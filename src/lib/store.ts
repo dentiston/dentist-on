@@ -46,3 +46,9 @@ export function reminderMessage(name: string, lines: { name: string; qty: number
     `هل تحتاج مساعدة لإكمال الطلب؟ ${url}`,
   ].join("\n");
 }
+
+// عنوان الموقع المنشور (مثال https://dentist-on.lovable.app) لروابط المشاركة وصور المعاينة.
+// يُضبط في VITE_SITE_URL؛ وإلا يُؤخذ من المتصفح.
+export const SITE_URL = String(import.meta.env["VITE_SITE_URL"] ?? "").replace(/\/$/, "");
+export const absUrl = (path: string) =>
+  `${SITE_URL || (typeof window !== "undefined" ? window.location.origin : "")}${path}`;

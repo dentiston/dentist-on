@@ -15,6 +15,8 @@ export type Product = {
   description: string;
   active: boolean;
   stock?: number | null;
+  images?: string[] | null; // صور إضافية بعد الصورة الرئيسية
+  created_at?: string;
 };
 
 export const categories = ["الكل", "أدوات يدوية", "مواد ترميمية", "قبضات وأجهزة", "تعقيم ووقاية"];
