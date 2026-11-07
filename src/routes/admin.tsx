@@ -39,7 +39,7 @@ function AdminPage() {
   const { session, isAdmin, isStaff, perms, loading } = useAdmin();
   if (loading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
   if (!session) return <Login />;
-  if (session.user.user_metadata?.must_change_password) return <ChangePassword />;
+  if (session.user.user_metadata?.["must_change_password"]) return <ChangePassword />;
   if (!isAdmin && !isStaff)
     return (
       <main className="mx-auto max-w-md px-4 py-20 text-center">
@@ -256,7 +256,7 @@ function Products() {
           className="mb-6 grid gap-3 rounded-2xl bg-secondary p-4 sm:grid-cols-2"
           onSubmit={async (e) => {
             e.preventDefault();
-            const row = { ...edit, id: isNew ? edit.id || crypto.randomUUID().slice(0, 8) : edit.id };
+            const row = { ...edit, images: edit.images ?? [], id: isNew ? edit.id || crypto.randomUUID().slice(0, 8) : edit.id };
             const { error } = isNew ? await supabase.from("products").insert(row) : await supabase.from("products").update(row).eq("id", edit.id);
             if (error) { toast.error(error.message); return; }
             toast.success("تم الحفظ"); setEdit(null); refresh();

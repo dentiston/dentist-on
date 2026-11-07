@@ -58,7 +58,7 @@ function Requests() {
       <h2 className="text-xl font-black">طلبات التوفر ({data.filter((r) => r.status === "جديد").length} جديد)</h2>
       {data.length === 0 && <p className="mt-3 text-muted-foreground">لا توجد طلبات.</p>}
       <div className="mt-3 space-y-3">
-        {data.map((r) => <RequestCard key={`${r.id}-${r.replied_at}`} r={r} cust={custs[r.user_id]} />)}
+        {data.map((r) => <RequestCard key={`${r.id}-${r.replied_at}`} r={r} {...(custs[r.user_id] ? { cust: custs[r.user_id] } : {})} />)}
       </div>
     </div>
   );

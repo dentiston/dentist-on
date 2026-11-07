@@ -14,6 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          at: string
+          details: Json | null
+          entity: string
+          entity_id: string | null
+          id: number
+          user_email: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          at?: string
+          details?: Json | null
+          entity: string
+          entity_id?: string | null
+          id?: never
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          at?: string
+          details?: Json | null
+          entity?: string
+          entity_id?: string | null
+          id?: never
+          user_email?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       customer_carts: {
         Row: {
           items: Json
@@ -63,6 +96,54 @@ export type Database = {
           created_at?: string
           discount_percent?: number
           phone?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      material_requests: {
+        Row: {
+          brand: string
+          created_at: string
+          id: string
+          image_url: string | null
+          name: string
+          note: string
+          product_id: string | null
+          qty: number
+          replied_at: string | null
+          reply_note: string
+          reply_price: number | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          brand?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name: string
+          note?: string
+          product_id?: string | null
+          qty?: number
+          replied_at?: string | null
+          reply_note?: string
+          reply_price?: number | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          brand?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          note?: string
+          product_id?: string | null
+          qty?: number
+          replied_at?: string | null
+          reply_note?: string
+          reply_price?: number | null
           status?: string
           user_id?: string
         }
@@ -153,6 +234,7 @@ export type Database = {
           description: string
           id: string
           image: string
+          images: string[]
           name: string
           price: number
           stock: number | null
@@ -166,6 +248,7 @@ export type Database = {
           description?: string
           id: string
           image?: string
+          images?: string[]
           name: string
           price?: number
           stock?: number | null
@@ -179,6 +262,7 @@ export type Database = {
           description?: string
           id?: string
           image?: string
+          images?: string[]
           name?: string
           price?: number
           stock?: number | null
@@ -248,6 +332,59 @@ export type Database = {
         }
         Relationships: []
       }
+      staff_profiles: {
+        Row: {
+          created_at: string
+          email: string
+          permissions: string[]
+          phone: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          permissions?: string[]
+          phone?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          permissions?: string[]
+          phone?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stock_watch: {
+        Row: {
+          created_at: string
+          notified_at: string | null
+          product_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          notified_at?: string | null
+          product_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          notified_at?: string | null
+          product_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_watch_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_settings: {
         Row: {
           key: string
@@ -290,6 +427,24 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      ask_material: {
+        Args: {
+          p_brand: string
+          p_image?: string
+          p_name: string
+          p_note: string
+          p_qty: number
+        }
+        Returns: string
+      }
+      audit_trim: { Args: { j: Json }; Returns: Json }
+      best_sellers: {
+        Args: never
+        Returns: {
+          product_id: string
+          qty: number
+        }[]
+      }
       check_coupon: {
         Args: { p_code: string }
         Returns: {
@@ -300,6 +455,7 @@ export type Database = {
           target: string
         }[]
       }
+      has_perm: { Args: { _perm: string; _uid: string }; Returns: boolean }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -333,7 +489,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "staff"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -461,7 +617,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "staff"],
     },
   },
 } as const
