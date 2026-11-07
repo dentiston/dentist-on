@@ -4,6 +4,7 @@ export type InvoiceOrder = {
   id: string; customer_name: string; phone: string; address: string; created_at: string;
   items: { name: string; qty: number; unit: number }[]; total: number; paid?: boolean | null;
   total_syp?: number | null; exchange_rate?: number | null; delivery_fee?: number | null; zone?: string | null;
+  discount_total?: number | null; coupon?: string | null;
 };
 
 const esc = (s: unknown) =>
@@ -35,7 +36,7 @@ th,td{border:1px solid #bbb;padding:8px;text-align:right}th{background:#f2f2f2}
 <div class="meta"><div>العميل: <b>${esc(o.customer_name)}</b></div><div>الهاتف: <span dir="ltr">${esc(o.phone)}</span></div>
 <div>العنوان: ${esc(o.address)}${o.zone ? ` — ${esc(o.zone)}` : ""}</div></div>
 <table><thead><tr><th>#</th><th>المنتج</th><th>الكمية</th><th>السعر</th><th>المجموع</th></tr></thead><tbody>${rows}</tbody></table>
-<div class="sum"><div>المجموع الفرعي: ${fmt(sub)}</div>${fee > 0 ? `<div>رسوم التوصيل: ${fmt(fee)}</div>` : ""}
+<div class="sum"><div>المجموع الفرعي: ${fmt(sub)}</div>${Number(o.discount_total ?? 0) > 0 ? `<div>منها خصومات بقيمة: ${fmt(Number(o.discount_total))}${o.coupon ? ` (قسيمة ${esc(o.coupon)})` : ""}</div>` : ""}${fee > 0 ? `<div>رسوم التوصيل: ${fmt(fee)}</div>` : ""}
 <div class="tot">الإجمالي: <b>${fmt(Number(o.total))}</b></div>${syp}</div>
 <div class="stamp">${o.paid ? "الحالة: مدفوعة" : "الحالة: غير مدفوعة"}</div>
 </body></html>`);
