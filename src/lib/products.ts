@@ -31,6 +31,9 @@ export const productsQuery = {
 };
 export const useProducts = () => useQuery(productsQuery);
 
-export const unitPrice = (p: Product, qty: number) => Number(qty >= 10 ? p.bulk_price : p.price);
+export const unitPrice = (p: Product, qty: number, disc = 0) => {
+  const u = Number(qty >= 10 ? p.bulk_price : p.price);
+  return disc > 0 ? Math.round(u * (1 - disc / 100) * 100) / 100 : u;
+};
 export const soldOut = (p: Product) => p.stock != null && p.stock <= 0;
 export const fmt = (n: number) => `$${Number(n).toFixed(2)}`;

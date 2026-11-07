@@ -35,3 +35,14 @@ export function statusMessage(name: string, ref: string, status: string) {
   };
   return `مرحباً ${name}، ${body[status] ?? `حالة طلبك ${r}: ${status}`}`;
 }
+
+// رقم هاتف: أرقام لاتينية و + ومسافات وشرطات (9–16 خانة)
+export const PHONE_PATTERN = "[0-9+\\s\\-]{9,16}";
+
+export function reminderMessage(name: string, lines: { name: string; qty: number }[], url: string) {
+  return [
+    `مرحباً ${name}، لاحظنا أن سلتك في Dentist On ما زالت تنتظر:`,
+    ...lines.map((l) => `- ${l.name} × ${l.qty}`),
+    `هل تحتاج مساعدة لإكمال الطلب؟ ${url}`,
+  ].join("\n");
+}

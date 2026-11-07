@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 export type Customer = {
   user_id: string; clinic_name: string; phone: string; address: string;
-  status: "pending" | "approved" | "rejected"; created_at: string;
+  status: "pending" | "approved" | "rejected"; created_at: string; discount_percent?: number | null;
 };
 
 export function useCustomer() {
