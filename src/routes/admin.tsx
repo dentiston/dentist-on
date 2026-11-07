@@ -39,7 +39,7 @@ function AdminPage() {
   const { session, isAdmin, isStaff, perms, loading } = useAdmin();
   if (loading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
   if (!session) return <Login />;
-  if (session.user.user_metadata?["must_change_password"]) return <ChangePassword />;
+  if (session.user.user_metadata?.["must_change_password"]) return <ChangePassword />;
   if (!isAdmin && !isStaff)
     return (
       <main className="mx-auto max-w-md px-4 py-20 text-center">
