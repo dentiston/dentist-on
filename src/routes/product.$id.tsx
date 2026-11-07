@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { useProducts, unitPrice, imgSrc, soldOut } from "@/lib/products";
 import { Price } from "@/components/Price";
 import { useCart } from "@/lib/cart";
+import { useDiscounts } from "@/lib/promos";
 
 export const Route = createFileRoute("/product/$id")({
   head: () => ({
@@ -24,9 +25,11 @@ function ProductPage() {
   const { data, isLoading } = useProducts();
   const p = data?.find((x) => x.id === id);
   const { add } = useCart();
+  const pctFor = useDiscounts();
   const [qty, setQty] = useState(1);
   if (isLoading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
   if (!p) return <main className="py-20 text-center">المنتج غير موجود. <Link to="/" className="font-bold underline">العودة</Link></main>;
+  const pct = pctFor(p);
   return (
     <main className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-2">
       <img src={imgSrc(p.image)} alt={p.name} width={816} height={816} className="w-full rounded-3xl bg-muted object-cover" />
@@ -36,8 +39,9 @@ function ProductPage() {
         <h1 className="text-3xl font-black">{p.name}</h1>
         <p className="mt-4 text-muted-foreground">{p.description}</p>
         <div className="mt-6 rounded-2xl bg-secondary p-4">
-          <div className="flex justify-between"><span>سعر القطعة</span><b className="text-left"><Price usd={p.price} /></b></div>
-          <div className="mt-2 flex justify-between"><span>سعر الجملة (10+)</span><b className="text-left text-primary"><Price usd={p.bulk_price} /></b></div>
+          {pct > 0 && <div className="mb-2 inline-block rounded-full bg-accent px-3 py-0.5 text-sm font-black text-accent-foreground">خصم {pct}%</div>}
+          <div className="flex justify-between"><span>سعر القطعة</span><b className="text-left">{pct > 0 && <s className="block text-xs font-normal text-muted-foreground"><Price usd={p.price} usdToo={false} /></s>}<Price usd={unitPrice(p, 1, pct)} /></b></div>
+          <div className="mt-2 flex justify-between"><span>سعر الجملة (10+)</span><b className="text-left text-primary">{pct > 0 && <s className="block text-xs font-normal text-muted-foreground"><Price usd={p.bulk_price} usdToo={false} /></s>}<Price usd={unitPrice(p, 10, pct)} /></b></div>
         </div>
         <div className="mt-6 flex items-center gap-3">
           <div className="flex items-center rounded-full border border-input">
@@ -46,7 +50,7 @@ function ProductPage() {
             <button className="px-4 py-2 text-lg" onClick={() => setQty(qty + 1)}>+</button>
           </div>
           <button disabled={soldOut(p)} onClick={() => { add(p.id, qty); toast.success("أُضيف إلى السلة"); }} className="flex-1 rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-50">
-            {soldOut(p) ? "نفد المخزون" : <>أضف للسلة — <Price usd={unitPrice(p, qty) * qty} usdToo={false} /></>}
+            {soldOut(p) ? "نفد المخزون" : <>أضف للسلة — <Price usd={unitPrice(p, qty, pct) * qty} usdToo={false} /></>}
           </button>
         </div>
       </div>

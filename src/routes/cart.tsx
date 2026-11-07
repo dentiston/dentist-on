@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Trash2 } from "lucide-react";
-import { useProducts, unitPrice, imgSrc } from "@/lib/products";
+import { useProducts, unitPrice, imgSrc, type Product } from "@/lib/products";
+import { autoPercent, promoMatches, usePromotions } from "@/lib/promos";
 import { Price } from "@/components/Price";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -26,6 +27,8 @@ export const Route = createFileRoute("/cart")({
   component: CartPage,
 });
 
+type Coupon = { name: string; percent: number; scope: string; target: string | null; min_order: number };
+
 function CartPage() {
   const { cart, set, clear } = useCart();
   const [done, setDone] = useState(false);
@@ -41,8 +44,24 @@ function CartPage() {
   const zones = cfg?.zones ?? {};
   const zoneNames = Object.keys(zones);
   const minOrder = cfg?.minOrder ?? 0;
+  const { data: promos = [] } = usePromotions();
+  const [code, setCode] = useState("");
+  const [coupon, setCoupon] = useState<Coupon | null>(null);
+  // الأفضل للزبون بين: خصم حسابه، الخصم التلقائي، القسيمة (لا تتراكم)
+  const linePct = (p: Product) => Math.max(disc, autoPercent(p, promos), coupon && promoMatches(coupon, p) ? Number(coupon.percent) : 0);
   const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] ?? 0 }));
-  const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty, disc) * qty, 0);
+  const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty, linePct(p)) * qty, 0);
+  const listSub = items.reduce((s, { p, qty }) => s + unitPrice(p, qty) * qty, 0);
+  const couponBelowMin = !!coupon && listSub < Number(coupon.min_order);
+  const applyCoupon = async () => {
+    const c = code.trim().toUpperCase();
+    if (!c) return;
+    const { data, error } = await supabase.rpc("check_coupon", { p_code: c });
+    const row = Array.isArray(data) ? data[0] : null;
+    if (error || !row) { setCoupon(null); toast.error("كود الخصم غير صالح أو منتهٍ"); return; }
+    setCoupon(row as unknown as Coupon);
+    toast.success("تم تطبيق الكود");
+  };
   const fee = zoneNames.length ? Number(zones[zone] ?? 0) : 0;
   const grand = total + fee;
   const belowMin = minOrder > 0 && total < minOrder;
@@ -74,7 +93,7 @@ function CartPage() {
                 <img src={imgSrc(p.image)} alt={p.name} loading="lazy" className="h-20 w-20 rounded-xl object-cover" />
                 <div className="flex-1">
                   <div className="font-bold leading-snug">{p.name}</div>
-                  <div className="text-sm text-muted-foreground"><Price usd={unitPrice(p, qty, disc)} usdToo={false} /> للقطعة {qty >= 10 && "· سعر جملة"}</div>
+                  <div className="text-sm text-muted-foreground"><Price usd={unitPrice(p, qty, linePct(p))} usdToo={false} /> للقطعة {qty >= 10 && "· سعر جملة"}</div>
                   <div className="mt-2 flex items-center gap-2">
                     <button className="h-8 w-8 rounded-full bg-muted" onClick={() => set(p.id, qty - 1)}>−</button>
                     <span className="w-6 text-center font-bold">{qty}</span>
@@ -82,7 +101,7 @@ function CartPage() {
                   </div>
                 </div>
                 <div className="text-left">
-                  <Price usd={unitPrice(p, qty, disc) * qty} className="block font-black" />
+                  <Price usd={unitPrice(p, qty, linePct(p)) * qty} className="block font-black" />
                   <button aria-label="حذف" onClick={() => set(p.id, 0)} className="mt-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
@@ -100,10 +119,11 @@ function CartPage() {
                 p_name: String(f.get("name")), p_phone: String(f.get("phone")), p_address: String(f.get("address")),
                 p_items: items.map(({ p, qty }) => ({ id: p.id, qty })),
                 p_zone: zoneNames.length ? zone : null,
+                p_coupon: coupon ? code.trim().toUpperCase() : null,
               });
               setBusy(false);
               if (error) {
-                toast.error(error.message.includes("account not approved") ? "حسابك بانتظار الموافقة" : error.message.includes("below minimum") ? "الطلب أقل من الحد الأدنى" : error.message.includes("zone required") ? "اختر منطقة التوصيل" : error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
+                toast.error(error.message.includes("account not approved") ? "حسابك بانتظار الموافقة" : error.message.includes("below minimum") ? "الطلب أقل من الحد الأدنى" : error.message.includes("zone required") ? "اختر منطقة التوصيل" : error.message.includes("invalid coupon") ? "كود الخصم غير صالح أو انتهى" : error.message.includes("coupon minimum") ? "الطلب أقل من الحد الأدنى للقسيمة" : error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
                 return;
               }
               setWaText(orderMessage(String(id), String(f.get("name")), items.map(({ p, qty }) => ({ name: p.name, qty })), fmt(grand)));
@@ -111,10 +131,10 @@ function CartPage() {
             }}
             className="h-fit space-y-3 rounded-2xl bg-secondary p-5"
           >
-            {(disc > 0 || fee > 0) && (
+            {(listSub - total > 0.005 || fee > 0) && (
               <div className="space-y-1 text-sm text-muted-foreground">
-                <div className="flex justify-between"><span>المجموع</span><Price usd={total} usdToo={false} /></div>
-                {disc > 0 && <div>خصم حسابك مطبّق: {disc}%</div>}
+                <div className="flex justify-between"><span>المجموع</span><Price usd={listSub} usdToo={false} /></div>
+                {listSub - total > 0.005 && <div className="flex justify-between"><span>إجمالي الخصومات</span><span>−<Price usd={listSub - total} usdToo={false} /></span></div>}
                 {fee > 0 && <div className="flex justify-between"><span>رسوم التوصيل</span><Price usd={fee} usdToo={false} /></div>}
               </div>
             )}
@@ -134,11 +154,19 @@ function CartPage() {
                 {zoneNames.map((z) => <option key={z} value={z}>{z} — {fmt(Number(zones[z]))}</option>)}
               </select>
             )}
+            <div>
+              <div className="flex gap-2">
+                <input value={code} onChange={(e) => { setCode(e.target.value); setCoupon(null); }} placeholder="كود الخصم (اختياري)" dir="ltr" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+                <button type="button" onClick={applyCoupon} className="shrink-0 rounded-xl bg-muted px-4 font-bold">تطبيق</button>
+              </div>
+              {coupon && <div className="mt-1 text-xs font-bold text-primary">تم تطبيق «{coupon.name}» — خصم {coupon.percent}%</div>}
+              {couponBelowMin && <div className="mt-1 text-xs text-destructive">القسيمة تتطلب طلباً بقيمة <Price usd={Number(coupon?.min_order ?? 0)} usdToo={false} /> على الأقل</div>}
+            </div>
             <input name="name" required defaultValue={customer?.clinic_name} placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <input name="phone" required defaultValue={customer?.phone} type="tel" pattern={PHONE_PATTERN} title="أرقام لاتينية فقط، مثال 0944123456" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <input name="address" required defaultValue={customer?.address} placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <p className="text-xs text-muted-foreground">يُحتسب السعر النهائي بسعر الصرف لحظة تأكيد الطلب.</p>
-            <button disabled={busy || !canOrder || belowMin || (zoneNames.length > 0 && !zone)} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
+            <button disabled={busy || !canOrder || belowMin || couponBelowMin || (zoneNames.length > 0 && !zone)} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
           </form>
         </div>
       )}

@@ -7,7 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
 import { categories, fmt, imgSrc, unitPrice, useProducts, type Product } from "@/lib/products";
 import { ProductImport } from "@/components/ProductImport";
-import { useShopConfig } from "@/lib/config";
+import { defaultHome, useShopConfig, type HomeConfig } from "@/lib/config";
 import { printInvoice, type InvoiceOrder } from "@/lib/invoice";
 import { fmtSyp, useRate } from "@/lib/rate";
 import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib/store";
@@ -86,7 +86,7 @@ function Login() {
 
 function Dashboard({ email }: { email: string }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"orders" | "customers" | "carts" | "products" | "rate">("orders");
+  const [tab, setTab] = useState<"orders" | "customers" | "carts" | "promos" | "home" | "products" | "rate">("orders");
   const { data: orders = [] } = useQuery(ordersQuery);
   const { data: customers = [] } = useQuery(customersQuery);
   const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : 0;
@@ -112,15 +112,15 @@ function Dashboard({ email }: { email: string }) {
           <button onClick={() => supabase.auth.signOut()} aria-label="خروج"><LogOut className="h-4 w-4" /></button>
         </div>
       </div>
-      <div className="mt-6 flex gap-2">
-        {(["orders", "customers", "carts", "products", "rate"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`rounded-full px-5 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", customers: "العملاء", carts: "سلال متروكة", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
+      <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
+        {(["orders", "customers", "carts", "promos", "home", "products", "rate"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+            {({ orders: "الطلبات", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
             {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "carts" ? <AbandonedCarts /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
+      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
     </main>
   );
 }
@@ -601,6 +601,207 @@ function ShopRules() {
           <button className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground">حفظ القواعد</button>
         </form>
       </div>
+    </section>
+  );
+}
+
+type PromoRow = {
+  id: string; name: string; percent: number; scope: "all" | "category" | "product"; target: string | null; code: string | null;
+  min_order: number; starts_at: string | null; ends_at: string | null; max_uses: number | null; used_count: number; active: boolean;
+};
+type PromoForm = {
+  id?: string; name: string; percent: string; scope: PromoRow["scope"]; target: string; code: string;
+  min_order: string; starts_at: string; ends_at: string; max_uses: string; active: boolean;
+};
+const blankPromo: PromoForm = { name: "", percent: "10", scope: "all", target: "", code: "", min_order: "0", starts_at: "", ends_at: "", max_uses: "", active: true };
+const toLocalInput = (iso: string | null) => (iso ? new Date(new Date(iso).getTime() - new Date(iso).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : "");
+
+function Promotions() {
+  const qc = useQueryClient();
+  const { data = [], isLoading } = useQuery({
+    queryKey: ["admin-promos"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("promotions").select("*").order("created_at", { ascending: false });
+      if (error) throw error;
+      return data as unknown as PromoRow[];
+    },
+  });
+  const { data: products = [] } = useProducts();
+  const cats = Array.from(new Set([...categories.slice(1), ...products.map((p) => p.category)]));
+  const [f, setF] = useState<PromoForm | null>(null);
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["admin-promos"] }); qc.invalidateQueries({ queryKey: ["promos"] }); };
+  const state = (x: PromoRow) => {
+    const now = Date.now();
+    if (!x.active) return "متوقف";
+    if (x.starts_at && new Date(x.starts_at).getTime() > now) return "مجدول";
+    if (x.ends_at && new Date(x.ends_at).getTime() <= now) return "منتهٍ";
+    if (x.max_uses != null && x.used_count >= x.max_uses) return "استُنفد";
+    return "فعّال";
+  };
+  const targetName = (x: PromoRow) =>
+    x.scope === "all" ? "كل المنتجات" : x.scope === "category" ? `تصنيف: ${x.target}` : `منتج: ${products.find((p) => p.id === x.target)?.name ?? x.target}`;
+
+  return (
+    <section className="mt-6">
+      <p className="text-sm text-muted-foreground">خصم تلقائي (بلا كود) يظهر على الأسعار فوراً، أو قسيمة بكود يدخله الزبون في السلة. عند تعدد الخصومات يُطبَّق الأفضل للزبون ولا تتراكم.</p>
+      <button onClick={() => setF({ ...blankPromo })} className="mt-4 rounded-full bg-accent px-5 py-2 font-bold text-accent-foreground">+ خصم جديد</button>
+
+      {f && (
+        <form
+          className="mt-4 grid max-w-xl gap-3 rounded-2xl bg-secondary p-5"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const pct = Number(f.percent);
+            if (!(pct > 0 && pct <= 90)) { toast.error("النسبة بين 1 و90"); return; }
+            if (f.scope !== "all" && !f.target) { toast.error("اختر التصنيف أو المنتج"); return; }
+            const code = f.code.trim().toUpperCase();
+            if (code && !/^[A-Z0-9_-]{3,30}$/.test(code)) { toast.error("الكود: أحرف إنجليزية وأرقام و - و _ (3 إلى 30)"); return; }
+            const row = {
+              name: f.name.trim(), percent: pct, scope: f.scope, target: f.scope === "all" ? null : f.target, code: code || null,
+              min_order: code ? Math.max(0, Number(f.min_order) || 0) : 0,
+              starts_at: f.starts_at ? new Date(f.starts_at).toISOString() : null,
+              ends_at: f.ends_at ? new Date(f.ends_at).toISOString() : null,
+              max_uses: code && f.max_uses !== "" ? Math.max(1, Math.floor(Number(f.max_uses))) : null,
+              active: f.active,
+            };
+            const { error } = f.id ? await supabase.from("promotions").update(row).eq("id", f.id) : await supabase.from("promotions").insert(row);
+            if (error) { toast.error(error.message.includes("duplicate") ? "هذا الكود مستخدم" : error.message); return; }
+            toast.success("تم الحفظ"); setF(null); refresh();
+          }}
+        >
+          <label className="text-sm">اسم الخصم<input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder="مثال: عرض الشتاء" className={input} /></label>
+          <label className="text-sm">النسبة %<input required type="number" min="1" max="90" step="0.5" value={f.percent} onChange={(e) => setF({ ...f, percent: e.target.value })} className={input} dir="ltr" /></label>
+          <label className="text-sm">يُطبَّق على
+            <select value={f.scope} onChange={(e) => setF({ ...f, scope: e.target.value as PromoRow["scope"], target: "" })} className={input}>
+              <option value="all">كل المنتجات</option><option value="category">تصنيف</option><option value="product">منتج محدد</option>
+            </select>
+          </label>
+          {f.scope === "category" && (
+            <select required value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} className={input}>
+              <option value="" disabled>اختر التصنيف</option>{cats.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          {f.scope === "product" && (
+            <select required value={f.target} onChange={(e) => setF({ ...f, target: e.target.value })} className={input}>
+              <option value="" disabled>اختر المنتج</option>{products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          )}
+          <label className="text-sm">كود القسيمة — اتركه فارغاً لخصم تلقائي<input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })} placeholder="WINTER10" className={input} dir="ltr" /></label>
+          {f.code.trim() && (
+            <div className="grid grid-cols-2 gap-3">
+              <label className="text-sm">حد أدنى للطلب ($)<input type="number" min="0" step="any" value={f.min_order} onChange={(e) => setF({ ...f, min_order: e.target.value })} className={input} dir="ltr" /></label>
+              <label className="text-sm">أقصى عدد استخدامات<input type="number" min="1" value={f.max_uses} onChange={(e) => setF({ ...f, max_uses: e.target.value })} placeholder="بلا حد" className={input} dir="ltr" /></label>
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm">يبدأ<input type="datetime-local" value={f.starts_at} onChange={(e) => setF({ ...f, starts_at: e.target.value })} className={input} dir="ltr" /></label>
+            <label className="text-sm">ينتهي<input type="datetime-local" value={f.ends_at} onChange={(e) => setF({ ...f, ends_at: e.target.value })} className={input} dir="ltr" /></label>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> مفعّل</label>
+          <div className="flex gap-2">
+            <button className="rounded-full bg-primary px-6 py-2 font-bold text-primary-foreground">حفظ</button>
+            <button type="button" onClick={() => setF(null)} className="rounded-full bg-muted px-6 py-2">إلغاء</button>
+          </div>
+        </form>
+      )}
+
+      {isLoading && <p className="mt-4 text-muted-foreground">جارِ التحميل…</p>}
+      {!isLoading && data.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد خصومات بعد</p>}
+      <div className="mt-4 space-y-3">
+        {data.map((x) => (
+          <div key={x.id} className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="font-bold">{x.name} — {x.percent}%</div>
+                <div className="text-sm text-muted-foreground">{targetName(x)}</div>
+                {x.code ? <div className="text-sm" dir="ltr">كود: <b>{x.code}</b> · استُخدم {x.used_count}{x.max_uses != null ? ` / ${x.max_uses}` : ""}{x.min_order > 0 ? ` · حد أدنى $${x.min_order}` : ""}</div> : <div className="text-sm text-muted-foreground">خصم تلقائي</div>}
+                {(x.starts_at || x.ends_at) && <div className="text-xs text-muted-foreground">{x.starts_at ? `من ${new Date(x.starts_at).toLocaleDateString("ar")}` : ""} {x.ends_at ? `إلى ${new Date(x.ends_at).toLocaleDateString("ar")}` : ""}</div>}
+              </div>
+              <span className={`rounded-full px-3 py-1 text-xs font-bold ${state(x) === "فعّال" ? "bg-accent text-accent-foreground" : "bg-muted"}`}>{state(x)}</span>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button onClick={async () => { await supabase.from("promotions").update({ active: !x.active }).eq("id", x.id); refresh(); }} className="rounded-full bg-muted px-4 py-2 text-sm">{x.active ? "إيقاف" : "تفعيل"}</button>
+              <button onClick={() => setF({ id: x.id, name: x.name, percent: String(x.percent), scope: x.scope, target: x.target ?? "", code: x.code ?? "", min_order: String(x.min_order), starts_at: toLocalInput(x.starts_at), ends_at: toLocalInput(x.ends_at), max_uses: x.max_uses == null ? "" : String(x.max_uses), active: x.active })} className="rounded-full bg-muted px-4 py-2 text-sm">تعديل</button>
+              <button onClick={async () => { if (!confirm("حذف هذا الخصم؟")) return; await supabase.from("promotions").delete().eq("id", x.id); refresh(); }} className="rounded-full bg-muted px-4 py-2 text-sm text-destructive">حذف</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function HomeEditor() {
+  const qc = useQueryClient();
+  const { data: cfg } = useShopConfig();
+  const { data: products = [] } = useProducts();
+  const [draft, setDraft] = useState<HomeConfig | null>(null);
+  const [filter, setFilter] = useState("");
+  const h = draft ?? cfg?.home ?? defaultHome;
+  const upd = (patch: Partial<HomeConfig>) => setDraft({ ...h, ...patch });
+  const shown = products.filter((p) => p.name.includes(filter));
+
+  return (
+    <section className="mt-6 max-w-xl space-y-5">
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">شريط إعلان أعلى الصفحة</div>
+        <label className="mt-2 flex items-center gap-2 text-sm"><input type="checkbox" checked={h.announcement.enabled} onChange={(e) => upd({ announcement: { ...h.announcement, enabled: e.target.checked } })} /> إظهار الشريط</label>
+        <input value={h.announcement.text} onChange={(e) => upd({ announcement: { ...h.announcement, text: e.target.value } })} placeholder="مثال: خصم 15% على المواد الترميمية حتى نهاية الشهر" className={`${input} mt-2`} />
+      </div>
+
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">الواجهة الرئيسية</div>
+        <label className="mt-2 block text-sm">العنوان — ضع الجزء الملوّن بين نجمتين *هكذا*
+          <input value={h.hero.title} onChange={(e) => upd({ hero: { ...h.hero, title: e.target.value } })} className={input} />
+        </label>
+        <label className="mt-2 block text-sm">النص التعريفي
+          <textarea rows={3} value={h.hero.subtitle} onChange={(e) => upd({ hero: { ...h.hero, subtitle: e.target.value } })} className={input} />
+        </label>
+        <label className="mt-2 block text-sm">نص الزر
+          <input value={h.hero.button} onChange={(e) => upd({ hero: { ...h.hero, button: e.target.value } })} className={input} />
+        </label>
+        <label className="mt-2 block text-sm">صورة الواجهة
+          <input type="file" accept="image/*" className={input} onChange={async (e) => {
+            const file = e.target.files?.[0]; if (!file) return;
+            const path = `home/${crypto.randomUUID()}.${file.name.split(".").pop() ?? "jpg"}`;
+            const { error } = await supabase.storage.from("product-images").upload(path, file, { contentType: file.type });
+            if (error) { toast.error(error.message); return; }
+            upd({ hero: { ...h.hero, image: supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl } });
+            toast.success("تم رفع الصورة");
+          }} />
+        </label>
+        {h.hero.image && (
+          <div className="mt-2 flex items-center gap-3">
+            <img src={h.hero.image} alt="" className="h-16 w-28 rounded-lg object-cover" />
+            <button type="button" onClick={() => upd({ hero: { ...h.hero, image: "" } })} className="text-sm underline">استعادة الصورة الافتراضية</button>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">منتجات مميزة ({h.featured.length})</div>
+        <p className="text-xs text-muted-foreground">تظهر في قسم «منتجات مميزة» أعلى المتجر بترتيب اختيارك.</p>
+        <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="ابحث عن منتج" className={`${input} mt-2`} />
+        <div className="mt-2 max-h-60 space-y-1 overflow-y-auto">
+          {shown.map((p) => (
+            <label key={p.id} className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={h.featured.includes(p.id)} onChange={(e) => upd({ featured: e.target.checked ? [...h.featured, p.id] : h.featured.filter((x) => x !== p.id) })} />
+              {p.name}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={h.previous} onChange={(e) => upd({ previous: e.target.checked })} /> اقتراح «اشتريتَ سابقاً» للزبون المفعّل عند فتح المتجر</label>
+
+      <button
+        onClick={async () => {
+          const { error } = await supabase.from("shop_config").upsert({ key: "home", value: h as never });
+          if (error) { toast.error(error.message); return; }
+          toast.success("تم حفظ الصفحة الرئيسية"); setDraft(null); qc.invalidateQueries({ queryKey: ["shop_config"] });
+        }}
+        className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground"
+      >حفظ التعديلات</button>
     </section>
   );
 }
