@@ -8,10 +8,6 @@ https://github.com/medusajs/b2b-starter.git
 
 اسم المنصة Dentist On 
 
- و هذا الشعار المبدأي 
-
-يمكنك استوحاء الالوان منه
-
 This project was built with [Lovable](https://lovable.dev).
 
 **Live app**: https://dentist-on.lovable.app
