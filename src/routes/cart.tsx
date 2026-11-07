@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
 import { useCustomer } from "@/lib/customer";
+import { AskMaterial } from "@/components/AskMaterial";
 import { OrderTracker } from "@/components/OrderTracker";
 import { PHONE_PATTERN, WA_NUMBER, orderMessage, waLink } from "@/lib/store";
 import { useShopConfig } from "@/lib/config";
@@ -82,7 +83,10 @@ function CartPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-3xl font-black">سلة المشتريات</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-3xl font-black">سلة المشتريات</h1>
+        <AskMaterial inline />
+      </div>
       {items.length === 0 ? (
         <p className="py-16 text-center text-muted-foreground">السلة فارغة. <Link to="/" className="font-bold text-primary underline">تسوّق الآن</Link></p>
       ) : (

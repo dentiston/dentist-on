@@ -13,6 +13,7 @@ import { fmtSyp, useRate } from "@/lib/rate";
 import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib/store";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
+import { ChangePassword, MaterialRequests, Team, useNewRequests } from "@/components/AdminExtras";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -31,18 +32,22 @@ export const Route = createFileRoute("/admin")({
 
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 
+const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "rate", "team"] as const;
+type Tab = (typeof ALL_TABS)[number];
+
 function AdminPage() {
-  const { session, isAdmin, loading } = useAdmin();
+  const { session, isAdmin, isStaff, perms, loading } = useAdmin();
   if (loading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
   if (!session) return <Login />;
-  if (!isAdmin)
+  if (session.user.user_metadata?.must_change_password) return <ChangePassword />;
+  if (!isAdmin && !isStaff)
     return (
       <main className="mx-auto max-w-md px-4 py-20 text-center">
         <h1 className="text-2xl font-black">هذا الحساب ليس حساب مدير</h1>
         <button onClick={() => supabase.auth.signOut()} className="mt-6 rounded-full bg-primary px-6 py-2 font-bold text-primary-foreground">تسجيل الخروج</button>
       </main>
     );
-  return <Dashboard email={session.user.email ?? ""} />;
+  return <Dashboard email={session.user.email ?? ""} staff={!isAdmin} perms={perms} />;
 }
 
 function Login() {
@@ -84,12 +89,14 @@ function Login() {
   );
 }
 
-function Dashboard({ email }: { email: string }) {
+function Dashboard({ email, staff, perms }: { email: string; staff: boolean; perms: string[] }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"orders" | "customers" | "carts" | "promos" | "home" | "products" | "rate">("orders");
+  const tabs: readonly Tab[] = staff ? ALL_TABS.filter((t) => (t === "orders" || t === "requests" || t === "customers") && perms.includes(t)) : ALL_TABS;
+  const [tab, setTab] = useState<Tab>(tabs[0] ?? "orders");
   const { data: orders = [] } = useQuery(ordersQuery);
-  const { data: customers = [] } = useQuery(customersQuery);
-  const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : 0;
+  const { data: customers = [] } = useQuery({ ...customersQuery, enabled: !staff });
+  const { data: newReq = 0 } = useNewRequests(!staff || perms.includes("requests"));
+  const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : t === "requests" ? newReq : 0;
   useEffect(() => {
     const ch = supabase.channel("admin-alerts")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "customers" }, (p) => {
@@ -113,14 +120,14 @@ function Dashboard({ email }: { email: string }) {
         </div>
       </div>
       <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-        {(["orders", "customers", "carts", "promos", "home", "products", "rate"] as const).map((t) => (
+        {tabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
+            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
             {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
+      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
     </main>
   );
 }
@@ -144,7 +151,7 @@ const customersQuery = {
 
 const statuses = ["جديد", "قيد التجهيز", "تم الشحن", "مكتمل", "ملغي"];
 
-function Orders() {
+function Orders({ staff = false }: { staff?: boolean }) {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery(ordersQuery);
   const revenue = data.filter((o) => o.status !== "ملغي").reduce((s, o) => s + Number(o.total), 0);
@@ -155,9 +162,9 @@ function Orders() {
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <Stat label="عدد الطلبات" value={String(data.length)} />
         <Stat label="طلبات جديدة" value={String(data.filter((o) => o.status === "جديد").length)} />
-        <Stat label="إجمالي المبيعات" value={fmt(revenue)} />
+        {!staff && <Stat label="إجمالي المبيعات" value={fmt(revenue)} />}
         <Stat label="مكتملة هذا الأسبوع" value={String(weeks[weeks.length - 1]?.n ?? 0)} />
-        <Stat label="مبالغ غير محصّلة" value={fmt(unpaid)} />
+        {!staff && <Stat label="مبالغ غير محصّلة" value={fmt(unpaid)} />}
       </div>
       {isLoading && <p className="text-muted-foreground">جارِ التحميل…</p>}
       <WeeklyChart data={weeks} />
@@ -221,7 +228,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   return <div className="rounded-2xl bg-secondary p-4"><div className="text-sm text-muted-foreground">{label}</div><div className="text-2xl font-black">{value}</div></div>;
 }
 
-const empty: Product = { id: "", name: "", brand: "", category: "أدوات يدوية", price: 0, bulk_price: 0, image: "instruments", description: "", active: true, stock: null };
+const empty: Product = { id: "", name: "", brand: "", category: "أدوات يدوية", price: 0, bulk_price: 0, image: "instruments", description: "", active: true, stock: null, images: [] };
 
 function Products() {
   const qc = useQueryClient();
@@ -268,6 +275,29 @@ function Products() {
             setEdit({ ...edit, image: supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl });
             toast.success("تم رفع الصورة");
           }} /></label>
+          <div className="sm:col-span-2">
+            <div className="text-sm">صور إضافية</div>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(edit.images ?? []).map((src, k) => (
+                <div key={src} className="relative">
+                  <img src={imgSrc(src)} alt="" className="h-16 w-16 rounded-xl object-cover" />
+                  <button type="button" aria-label="حذف الصورة" onClick={() => setEdit({ ...edit, images: (edit.images ?? []).filter((_, j) => j !== k) })} className="absolute -top-2 -left-2 grid h-6 w-6 place-items-center rounded-full bg-destructive text-xs text-white">×</button>
+                </div>
+              ))}
+            </div>
+            <input type="file" accept="image/*" multiple className={`${input} mt-2`} onChange={async (e) => {
+              const files = Array.from(e.target.files ?? []); if (files.length === 0) return;
+              const urls: string[] = [];
+              for (const file of files) {
+                const path = `${crypto.randomUUID()}.${file.name.split(".").pop() ?? "jpg"}`;
+                const { error } = await supabase.storage.from("product-images").upload(path, file, { contentType: file.type });
+                if (error) { toast.error(error.message); continue; }
+                urls.push(supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl);
+              }
+              if (urls.length) { setEdit({ ...edit, images: [...(edit.images ?? []), ...urls] }); toast.success(`تم رفع ${urls.length} صورة`); }
+              e.target.value = "";
+            }} />
+          </div>
           <label className="text-sm">المخزون (فارغ = غير محدود)<input type="number" min="0" value={edit.stock ?? ""} onChange={(e) => setEdit({ ...edit, stock: e.target.value === "" ? null : Number(e.target.value) })} className={input} /></label>
           <label className="text-sm">السعر<input type="number" step="0.01" min="0" required value={edit.price} onChange={(e) => setEdit({ ...edit, price: Number(e.target.value) })} className={input} /></label>
           <label className="text-sm">سعر الجملة (10+)<input type="number" step="0.01" min="0" required value={edit.bulk_price} onChange={(e) => setEdit({ ...edit, bulk_price: Number(e.target.value) })} className={input} /></label>
@@ -347,7 +377,7 @@ function RateSettings() {
   );
 }
 
-function Customers() {
+function Customers({ readOnly = false }: { readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery(customersQuery);
   const label = { pending: "بانتظار الموافقة", approved: "مفعّل", rejected: "مرفوض" } as const;
@@ -377,7 +407,7 @@ function Customers() {
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-bold ${c.status === "pending" ? "bg-accent text-accent-foreground" : "bg-muted"}`}>{label[c.status]}</span>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className={`mt-3 flex flex-wrap gap-2 ${readOnly ? "hidden" : ""}`}>
             {c.status === "approved" && (
               <label className="flex items-center gap-2 text-sm">خصم %
                 <input type="number" min="0" max="100" step="0.5" defaultValue={c.discount_percent ?? 0} className="w-20 rounded-lg border border-input bg-card px-2 py-1"

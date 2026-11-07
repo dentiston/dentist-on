@@ -6,6 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCustomer } from "@/lib/customer";
 import { fmt } from "@/lib/products";
 import { PHONE_PATTERN } from "@/lib/store";
+import { MyRequests } from "@/components/AskMaterial";
+import { WatchAvailable } from "@/components/WatchAvailable";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -35,7 +37,7 @@ function AccountPage() {
       ) : (
         <>
           <Status status={customer.status} onRefresh={reload} />
-          {customer.status === "approved" && <Orders />}
+          {customer.status === "approved" && <><WatchAvailable /><Orders /><MyRequests /></>}
         </>
       )}
     </main>
