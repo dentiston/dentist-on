@@ -1,24 +1,26 @@
 import { Link } from "@tanstack/react-router";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { type Product, imgSrc, soldOut } from "@/lib/products";
+import { type Product, imgSrc, soldOut, unitPrice } from "@/lib/products";
 import { Price } from "@/components/Price";
 import { useCart } from "@/lib/cart";
 
-export function ProductCard({ p }: { p: Product }) {
+export function ProductCard({ p, pct = 0 }: { p: Product; pct?: number }) {
   const { add } = useCart();
   return (
     <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-card transition hover:-translate-y-1 hover:shadow-lg">
-      <Link to="/product/$id" params={{ id: p.id }} className="aspect-square overflow-hidden bg-muted">
+      <Link to="/product/$id" params={{ id: p.id }} className="relative aspect-square overflow-hidden bg-muted">
         <img src={imgSrc(p.image)} alt={p.name} loading="lazy" width={816} height={816} className="h-full w-full object-cover transition group-hover:scale-105" />
+        {pct > 0 && <span className="absolute right-2 top-2 rounded-full bg-accent px-2 py-0.5 text-xs font-black text-accent-foreground">-{pct}%</span>}
       </Link>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <span className="text-xs font-semibold text-muted-foreground">{p.brand}{soldOut(p) && <b className="mr-2 text-destructive">نفد</b>}</span>
         <Link to="/product/$id" params={{ id: p.id }} className="line-clamp-2 font-bold leading-snug">{p.name}</Link>
         <div className="mt-auto flex items-end justify-between pt-3">
           <div>
-            <Price usd={p.price} className="block text-lg font-black" />
-            <div className="text-xs text-muted-foreground"><Price usd={p.bulk_price} usdToo={false} /> للجملة (10+)</div>
+            <Price usd={unitPrice(p, 1, pct)} className="block text-lg font-black" />
+            {pct > 0 && <s className="text-xs text-muted-foreground"><Price usd={p.price} usdToo={false} /></s>}
+            <div className="text-xs text-muted-foreground"><Price usd={unitPrice(p, 10, pct)} usdToo={false} /> للجملة (10+)</div>
           </div>
           <button
             disabled={soldOut(p)}
