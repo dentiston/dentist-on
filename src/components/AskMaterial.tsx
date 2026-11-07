@@ -60,7 +60,7 @@ export function AskMaterial({ inline = false }: { inline?: boolean }) {
               const { error } = await supabase.rpc("ask_material", {
                 p_name: String(f.get("name")), p_brand: String(f.get("brand") ?? ""),
                 p_qty: Math.max(1, Math.floor(Number(f.get("qty")) || 1)),
-                p_note: String(f.get("note") ?? ""), p_image: imageUrl,
+                p_note: String(f.get("note") ?? ""), ...(imageUrl ? { p_image: imageUrl } : {}),
               });
               setBusy(false);
               if (error) { toast.error(errorText(error.message)); return; }
