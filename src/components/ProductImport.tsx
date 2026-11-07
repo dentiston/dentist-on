@@ -85,7 +85,7 @@ export function ProductImport({ onDone }: { onDone: () => void }) {
   const run = async () => {
     setBusy(true);
     for (let i = 0; i < ready.length; i += 100) {
-      const { error } = await supabase.from("products").upsert(ready.slice(i, i + 100));
+      const { error } = await supabase.from("products").upsert(ready.slice(i, i + 100).map((p) => ({ ...p, images: p.images ?? [] })));
       if (error) { setBusy(false); toast.error(`توقف الاستيراد: ${error.message}`); return; }
     }
     setBusy(false);
