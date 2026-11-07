@@ -5,10 +5,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useCart } from "@/lib/cart";
 import { useAdmin } from "@/lib/auth";
 import { useRate } from "@/lib/rate";
+import { InstallButton } from "@/components/InstallButton";
 
 export function SiteHeader() {
   const { count } = useCart();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isStaff } = useAdmin();
   const { data: r } = useRate();
   const rate = r?.rate ?? 0;
   return (
@@ -26,7 +27,8 @@ export function SiteHeader() {
         <nav className="flex items-center gap-3 sm:gap-5 text-sm font-semibold">
           <Link to="/" className="hidden sm:inline hover:text-accent">المتجر</Link>
           <Link to="/account" className="hover:text-accent">حسابي</Link>
-          {isAdmin && <Link to="/admin" className="hover:text-accent">المدير</Link>}
+          {(isAdmin || isStaff) && <Link to="/admin" className="hover:text-accent">{isAdmin ? "المدير" : "الطلبات"}</Link>}
+          <InstallButton />
           <ThemeToggle />
           <Link to="/cart" aria-label="السلة" className="relative flex items-center gap-2 rounded-full bg-primary px-3 sm:px-4 py-2 text-primary-foreground">
             <ShoppingCart className="h-4 w-4" />
