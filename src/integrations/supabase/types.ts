@@ -14,36 +14,132 @@ export type Database = {
   }
   public: {
     Tables: {
-      orders: {
+      customer_carts: {
         Row: {
-          address: string
-          created_at: string
-          customer_name: string
-          id: string
           items: Json
-          phone: string
-          status: string
-          total: number
+          reminded_at: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          address: string
-          created_at?: string
-          customer_name: string
-          id?: string
           items?: Json
+          reminded_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          items?: Json
+          reminded_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          address: string
+          approved_at: string | null
+          clinic_name: string
+          created_at: string
+          discount_percent: number
           phone: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          address?: string
+          approved_at?: string | null
+          clinic_name?: string
+          created_at?: string
+          discount_percent?: number
+          phone?: string
           status?: string
-          total?: number
+          user_id: string
         }
         Update: {
           address?: string
+          approved_at?: string | null
+          clinic_name?: string
           created_at?: string
-          customer_name?: string
+          discount_percent?: number
+          phone?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      notify_settings: {
+        Row: {
+          key: string
+          value: string
+        }
+        Insert: {
+          key: string
+          value: string
+        }
+        Update: {
+          key?: string
+          value?: string
+        }
+        Relationships: []
+      }
+      orders: {
+        Row: {
+          address: string
+          completed_at: string | null
+          coupon: string | null
+          created_at: string
+          customer_id: string | null
+          customer_name: string
+          delivery_fee: number
+          discount_total: number
+          exchange_rate: number
+          id: string
+          items: Json
+          paid: boolean
+          phone: string
+          status: string
+          total: number
+          total_syp: number
+          zone: string | null
+        }
+        Insert: {
+          address: string
+          completed_at?: string | null
+          coupon?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name: string
+          delivery_fee?: number
+          discount_total?: number
+          exchange_rate?: number
           id?: string
           items?: Json
+          paid?: boolean
+          phone: string
+          status?: string
+          total?: number
+          total_syp?: number
+          zone?: string | null
+        }
+        Update: {
+          address?: string
+          completed_at?: string | null
+          coupon?: string | null
+          created_at?: string
+          customer_id?: string | null
+          customer_name?: string
+          delivery_fee?: number
+          discount_total?: number
+          exchange_rate?: number
+          id?: string
+          items?: Json
+          paid?: boolean
           phone?: string
           status?: string
           total?: number
+          total_syp?: number
+          zone?: string | null
         }
         Relationships: []
       }
@@ -59,6 +155,7 @@ export type Database = {
           image: string
           name: string
           price: number
+          stock: number | null
         }
         Insert: {
           active?: boolean
@@ -71,6 +168,7 @@ export type Database = {
           image?: string
           name: string
           price?: number
+          stock?: number | null
         }
         Update: {
           active?: boolean
@@ -83,6 +181,88 @@ export type Database = {
           image?: string
           name?: string
           price?: number
+          stock?: number | null
+        }
+        Relationships: []
+      }
+      promotions: {
+        Row: {
+          active: boolean
+          code: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          max_uses: number | null
+          min_order: number
+          name: string
+          percent: number
+          scope: string
+          starts_at: string | null
+          target: string | null
+          used_count: number
+        }
+        Insert: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_order?: number
+          name: string
+          percent: number
+          scope?: string
+          starts_at?: string | null
+          target?: string | null
+          used_count?: number
+        }
+        Update: {
+          active?: boolean
+          code?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          max_uses?: number | null
+          min_order?: number
+          name?: string
+          percent?: number
+          scope?: string
+          starts_at?: string | null
+          target?: string | null
+          used_count?: number
+        }
+        Relationships: []
+      }
+      shop_config: {
+        Row: {
+          key: string
+          value: Json
+        }
+        Insert: {
+          key: string
+          value: Json
+        }
+        Update: {
+          key?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      store_settings: {
+        Row: {
+          key: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          value?: number
         }
         Relationships: []
       }
@@ -109,12 +289,47 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_exists: { Args: never; Returns: boolean }
+      check_coupon: {
+        Args: { p_code: string }
+        Returns: {
+          min_order: number
+          name: string
+          percent: number
+          scope: string
+          target: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      notify_admin: {
+        Args: { p_message: string; p_title: string }
+        Returns: undefined
+      }
+      place_order: {
+        Args: {
+          p_address: string
+          p_coupon?: string
+          p_items: Json
+          p_name: string
+          p_phone: string
+          p_zone?: string
+        }
+        Returns: string
+      }
+      track_order: {
+        Args: { p_phone: string; p_ref: string }
+        Returns: {
+          created_at: string
+          items: Json
+          status: string
+          total: number
+        }[]
       }
     }
     Enums: {

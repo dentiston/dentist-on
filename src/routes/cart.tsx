@@ -118,8 +118,8 @@ function CartPage() {
               const { data: id, error } = await supabase.rpc("place_order", {
                 p_name: String(f.get("name")), p_phone: String(f.get("phone")), p_address: String(f.get("address")),
                 p_items: items.map(({ p, qty }) => ({ id: p.id, qty })),
-                p_zone: zoneNames.length ? zone : null,
-                p_coupon: coupon ? code.trim().toUpperCase() : null,
+                ...(zoneNames.length ? { p_zone: zone } : {}),
+                ...(coupon ? { p_coupon: code.trim().toUpperCase() } : {}),
               });
               setBusy(false);
               if (error) {
