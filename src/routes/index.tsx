@@ -23,6 +23,8 @@ function Index() {
   const [cat, setCat] = useState("الكل");
   const [q, setQ] = useState("");
   const { data: products = [], isLoading } = useProducts();
+  const present = new Set(products.map((p) => p.category));
+  const cats = ["الكل", ...categories.slice(1).filter((c) => present.has(c)), ...[...present].filter((c) => !categories.includes(c))];
   const list = products.filter((p) => (cat === "الكل" || p.category === cat) && p.name.includes(q));
   return (
     <main>
@@ -60,7 +62,7 @@ function Index() {
           </div>
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-          {categories.map((c) => (
+          {cats.map((c) => (
             <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${cat === c ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{c}</button>
           ))}
         </div>

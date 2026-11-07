@@ -5,9 +5,12 @@ import { toast } from "sonner";
 import { Pencil, Trash2, Plus, LogOut } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
-import { categories, fmt, imgSrc, useProducts, type Product } from "@/lib/products";
+import { categories, fmt, imgSrc, unitPrice, useProducts, type Product } from "@/lib/products";
+import { ProductImport } from "@/components/ProductImport";
+import { useShopConfig } from "@/lib/config";
+import { printInvoice, type InvoiceOrder } from "@/lib/invoice";
 import { fmtSyp, useRate } from "@/lib/rate";
-import { approvalMessage, statusMessage, waLinkTo } from "@/lib/store";
+import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib/store";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
 
@@ -45,10 +48,14 @@ function AdminPage() {
 function Login() {
   const [mode, setMode] = useState<"in" | "up">("in");
   const [busy, setBusy] = useState(false);
+  const { data: adminExists } = useQuery({
+    queryKey: ["admin_exists"],
+    queryFn: async () => { const { data, error } = await supabase.rpc("admin_exists"); if (error) throw error; return !!data; },
+  });
   return (
     <main className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-center text-3xl font-black">حساب المدير</h1>
-      <p className="mt-2 text-center text-sm text-muted-foreground">أول حساب يُنشأ هنا يصبح حساب المدير تلقائيًا.</p>
+      {adminExists === false && <p className="mt-2 text-center text-sm text-muted-foreground">أول حساب يُنشأ هنا يصبح حساب المدير تلقائيًا.</p>}
       <form
         className="mt-8 space-y-3"
         onSubmit={async (e) => {
@@ -70,7 +77,7 @@ function Login() {
           {mode === "in" ? "تسجيل الدخول" : "إنشاء حساب"}
         </button>
       </form>
-      <button onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-4 w-full text-sm text-muted-foreground underline">
+      <button hidden={adminExists !== false} onClick={() => setMode(mode === "in" ? "up" : "in")} className="mt-4 w-full text-sm text-muted-foreground underline">
         {mode === "in" ? "ليس لديك حساب؟ أنشئ حسابًا" : "لديك حساب؟ سجّل الدخول"}
       </button>
     </main>
@@ -79,7 +86,7 @@ function Login() {
 
 function Dashboard({ email }: { email: string }) {
   const qc = useQueryClient();
-  const [tab, setTab] = useState<"orders" | "customers" | "products" | "rate">("orders");
+  const [tab, setTab] = useState<"orders" | "customers" | "carts" | "products" | "rate">("orders");
   const { data: orders = [] } = useQuery(ordersQuery);
   const { data: customers = [] } = useQuery(customersQuery);
   const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : 0;
@@ -106,14 +113,14 @@ function Dashboard({ email }: { email: string }) {
         </div>
       </div>
       <div className="mt-6 flex gap-2">
-        {(["orders", "customers", "products", "rate"] as const).map((t) => (
+        {(["orders", "customers", "carts", "products", "rate"] as const).map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`rounded-full px-5 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", customers: "العملاء", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
+            {({ orders: "الطلبات", customers: "العملاء", carts: "سلال متروكة", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
             {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "products" ? <Products /> : <><RateSettings /><NotifySettings /></>}
+      {tab === "orders" ? <Orders /> : tab === "customers" ? <Customers /> : tab === "carts" ? <AbandonedCarts /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
     </main>
   );
 }
@@ -189,6 +196,7 @@ function Orders() {
                   {statuses.map((s) => <option key={s}>{s}</option>)}
                 </select>
                 <a href={waLinkTo(o.phone, statusMessage(o.customer_name, o.id, o.status))} target="_blank" rel="noreferrer" className="mt-1 block text-xs font-bold text-primary underline">رسالة واتساب للزبون</a>
+                <button onClick={() => { if (!printInvoice(o as unknown as InvoiceOrder)) toast.error("اسمح بالنوافذ المنبثقة لطباعة الفاتورة"); }} className="mt-1 block text-xs font-bold text-primary underline">طباعة فاتورة</button>
                 <label className="mt-1 flex items-center gap-2 text-xs">
                   <input type="checkbox" checked={!!o.paid} onChange={async (e) => {
                     const { error } = await supabase.from("orders").update({ paid: e.target.checked }).eq("id", o.id);
@@ -218,12 +226,21 @@ const empty: Product = { id: "", name: "", brand: "", category: "أدوات يد
 function Products() {
   const qc = useQueryClient();
   const { data = [] } = useProducts();
+  const { data: cfg } = useShopConfig();
+  const low = data.filter((p) => p.stock != null && p.stock <= (cfg?.lowStock ?? 5));
   const [edit, setEdit] = useState<Product | null>(null);
   const [isNew, setIsNew] = useState(false);
   const refresh = () => qc.invalidateQueries({ queryKey: ["products"] });
 
   return (
     <section className="mt-6">
+      {low.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-destructive/40 bg-card p-4 text-sm">
+          <div className="font-bold text-destructive">مخزون منخفض ({low.length})</div>
+          <ul className="mt-2 space-y-1">{low.map((p) => <li key={p.id}>{p.name} — المتبقي {p.stock}</li>)}</ul>
+        </div>
+      )}
+      <ProductImport onDone={refresh} />
       <button onClick={() => { setEdit({ ...empty }); setIsNew(true); }} className="mb-4 flex items-center gap-2 rounded-full bg-accent px-5 py-2 font-bold text-accent-foreground">
         <Plus className="h-4 w-4" /> منتج جديد
       </button>
@@ -240,9 +257,8 @@ function Products() {
         >
           <input required placeholder="اسم المنتج" value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} className={input} />
           <input placeholder="الماركة" value={edit.brand} onChange={(e) => setEdit({ ...edit, brand: e.target.value })} className={input} />
-          <select value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} className={input}>
-            {categories.slice(1).map((c) => <option key={c}>{c}</option>)}
-          </select>
+          <input list="cat-list" required placeholder="التصنيف" value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} className={input} />
+          <datalist id="cat-list">{categories.slice(1).map((c) => <option key={c} value={c} />)}</datalist>
           <input placeholder="رابط الصورة (https://...)" value={edit.image} onChange={(e) => setEdit({ ...edit, image: e.target.value })} className={input} dir="ltr" />
           <label className="text-sm">رفع صورة<input type="file" accept="image/*" className={input} onChange={async (e) => {
             const file = e.target.files?.[0]; if (!file) return;
@@ -362,6 +378,17 @@ function Customers() {
             <span className={`rounded-full px-3 py-1 text-xs font-bold ${c.status === "pending" ? "bg-accent text-accent-foreground" : "bg-muted"}`}>{label[c.status]}</span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
+            {c.status === "approved" && (
+              <label className="flex items-center gap-2 text-sm">خصم %
+                <input type="number" min="0" max="100" step="0.5" defaultValue={c.discount_percent ?? 0} className="w-20 rounded-lg border border-input bg-card px-2 py-1"
+                  onBlur={async (e) => {
+                    const v = Math.min(100, Math.max(0, Number(e.target.value) || 0));
+                    if (v === Number(c.discount_percent ?? 0)) return;
+                    const { error } = await supabase.from("customers").update({ discount_percent: v }).eq("user_id", c.user_id);
+                    if (error) toast.error("تعذر الحفظ"); else { toast.success("تم حفظ الخصم"); qc.invalidateQueries({ queryKey: ["customers"] }); }
+                  }} />
+              </label>
+            )}
             {c.status !== "approved" && <button onClick={() => setStatus(c, "approved")} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">موافقة</button>}
             {c.status === "pending" && <button onClick={() => setStatus(c, "rejected")} className="rounded-full bg-muted px-5 py-2 text-sm">رفض</button>}
             {c.status === "approved" && (
@@ -459,5 +486,121 @@ function WeeklyChart({ data }: { data: Wk[] }) {
         </ResponsiveContainer>
       </div>
     </div>
+  );
+}
+
+type CartRow = { user_id: string; items: Record<string, number> | null; updated_at: string; reminded_at: string | null };
+
+function AbandonedCarts() {
+  const qc = useQueryClient();
+  const [days, setDays] = useState(2);
+  const { data: carts = [], isLoading } = useQuery({
+    queryKey: ["admin-carts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("customer_carts").select("*");
+      if (error) throw error;
+      return data as unknown as CartRow[];
+    },
+  });
+  const { data: customers = [] } = useQuery(customersQuery);
+  const { data: products = [] } = useProducts();
+  const cutoff = Date.now() - days * 86_400_000;
+  const rows = carts
+    .map((c) => {
+      const cust = customers.find((x) => x.user_id === c.user_id);
+      const lines = Object.entries(c.items ?? {})
+        .map(([id, qty]) => ({ p: products.find((p) => p.id === id), qty: Number(qty) }))
+        .filter((l): l is { p: Product; qty: number } => !!l.p && l.qty > 0);
+      const disc = Number(cust?.discount_percent ?? 0);
+      const total = lines.reduce((s, l) => s + unitPrice(l.p, l.qty, disc) * l.qty, 0);
+      return { c, cust, lines, total };
+    })
+    .filter((r) => r.cust?.status === "approved" && r.lines.length > 0 && new Date(r.c.updated_at).getTime() < cutoff)
+    .sort((a, b) => new Date(a.c.updated_at).getTime() - new Date(b.c.updated_at).getTime());
+
+  return (
+    <section className="mt-6">
+      <label className="flex items-center gap-2 text-sm">سلال لم تُحدَّث منذ
+        <select value={days} onChange={(e) => setDays(Number(e.target.value))} className="rounded-lg border border-input bg-card px-2 py-1">
+          {[1, 2, 3, 7].map((d) => <option key={d} value={d}>{d} {d === 1 ? "يوم" : "أيام"}</option>)}
+        </select>
+      </label>
+      {isLoading && <p className="mt-4 text-muted-foreground">جارِ التحميل…</p>}
+      {!isLoading && rows.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد سلال متروكة لعملاء مفعّلين</p>}
+      <div className="mt-4 space-y-3">
+        {rows.map(({ c, cust, lines, total }) => (
+          <div key={c.user_id} className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className="font-bold">{cust?.clinic_name}</div>
+                <div className="text-sm text-muted-foreground" dir="ltr">{cust?.phone}</div>
+                <div className="text-xs text-muted-foreground">آخر تعديل: {new Date(c.updated_at).toLocaleDateString("ar")}</div>
+                {c.reminded_at && <div className="text-xs text-muted-foreground">آخر تذكير: {new Date(c.reminded_at).toLocaleDateString("ar")}</div>}
+              </div>
+              <b>{fmt(total)}</b>
+            </div>
+            <ul className="mt-3 space-y-0.5 border-t border-border pt-3 text-sm">
+              {lines.map((l) => <li key={l.p.id}>{l.p.name} × {l.qty}</li>)}
+            </ul>
+            <a
+              href={waLinkTo(cust?.phone ?? "", reminderMessage(cust?.clinic_name ?? "", lines.map((l) => ({ name: l.p.name, qty: l.qty })), `${window.location.origin}/cart`))}
+              target="_blank" rel="noreferrer"
+              onClick={() => { supabase.from("customer_carts").update({ reminded_at: new Date().toISOString() }).eq("user_id", c.user_id).then(() => qc.invalidateQueries({ queryKey: ["admin-carts"] })); }}
+              className="mt-3 inline-block rounded-full bg-accent px-5 py-2 text-sm font-bold text-accent-foreground"
+            >تذكير عبر واتساب</a>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ShopRules() {
+  const qc = useQueryClient();
+  const { data: cfg } = useShopConfig();
+  const [min, setMin] = useState<string | null>(null);
+  const [zones, setZones] = useState<string | null>(null);
+  const [low, setLow] = useState<string | null>(null);
+  const zonesSaved = Object.entries(cfg?.zones ?? {}).map(([z, f]) => `${z}=${f}`).join("\n");
+  return (
+    <section className="mt-8 max-w-md">
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">قواعد الطلب</div>
+        <form
+          className="mt-3 space-y-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const fees: Record<string, number> = {};
+            for (const line of (zones ?? zonesSaved).split("\n")) {
+              const [z, f] = line.split("=");
+              const raw = (f ?? "").trim();
+              const fee = Number(raw);
+              if (z && z.trim() && raw !== "" && Number.isFinite(fee) && fee >= 0) fees[z.trim()] = fee;
+            }
+            const rows = [
+              { key: "min_order_usd", value: Math.max(0, Number(min ?? cfg?.minOrder ?? 0) || 0) },
+              { key: "delivery_fees", value: fees },
+              { key: "low_stock_threshold", value: Math.max(0, Math.floor(Number(low ?? cfg?.lowStock ?? 5) || 0)) },
+            ];
+            const { error } = await supabase.from("shop_config").upsert(rows);
+            if (error) { toast.error(error.message); return; }
+            toast.success("تم حفظ القواعد");
+            setMin(null); setZones(null); setLow(null);
+            qc.invalidateQueries({ queryKey: ["shop_config"] });
+          }}
+        >
+          <label className="block text-sm">الحد الأدنى للطلب ($) — 0 = بلا حد
+            <input type="number" min="0" step="any" value={min ?? String(cfg?.minOrder ?? 0)} onChange={(e) => setMin(e.target.value)} className={input} dir="ltr" />
+          </label>
+          <label className="block text-sm">رسوم التوصيل حسب المنطقة — سطر لكل منطقة بالشكل «الاسم=الرسوم بالدولار»، والفراغ يعطّلها
+            <textarea rows={4} value={zones ?? zonesSaved} onChange={(e) => setZones(e.target.value)} className={input} placeholder={"دمشق=2\nريف دمشق=4"} />
+          </label>
+          <label className="block text-sm">تنبيه المخزون عندما يصل المتبقي إلى
+            <input type="number" min="0" value={low ?? String(cfg?.lowStock ?? 5)} onChange={(e) => setLow(e.target.value)} className={input} dir="ltr" />
+          </label>
+          <button className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground">حفظ القواعد</button>
+        </form>
+      </div>
+    </section>
   );
 }

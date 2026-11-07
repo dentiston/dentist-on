@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useCustomer } from "@/lib/customer";
 import { fmt } from "@/lib/products";
+import { PHONE_PATTERN } from "@/lib/store";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -100,6 +101,10 @@ function Auth() {
           e.preventDefault();
           const f = new FormData(e.currentTarget);
           const email = String(f.get("email")), password = String(f.get("password"));
+          if (mode === "up") {
+            if (String(f.get("website") ?? "") !== "") return; // فخ للروبوتات
+            if (Date.now() - Number(localStorage.getItem("signup-at") ?? 0) < 60_000) { toast.error("انتظر دقيقة قبل المحاولة مجدداً"); return; }
+          }
           setBusy(true);
           const { data, error } = mode === "in"
             ? await supabase.auth.signInWithPassword({ email, password })
@@ -112,16 +117,18 @@ function Auth() {
               });
           setBusy(false);
           if (error) { toast.error(error.message); return; }
+          if (mode === "up") localStorage.setItem("signup-at", String(Date.now()));
           if (mode === "up" && !data.session) toast.success("تحقق من بريدك الإلكتروني لتأكيد الحساب");
         }}
       >
         {mode === "up" && (
           <>
             <input name="clinic_name" required placeholder="اسم العيادة / الطبيب" className={input} />
-            <input name="phone" required type="tel" placeholder="رقم الهاتف (واتساب)" className={input} dir="ltr" />
+            <input name="phone" required type="tel" pattern={PHONE_PATTERN} title="أرقام لاتينية فقط، مثال 0944123456" placeholder="رقم الهاتف (واتساب)" className={input} dir="ltr" />
             <input name="address" required placeholder="العنوان" className={input} />
           </>
         )}
+        <input name="website" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
         <input name="email" type="email" required placeholder="البريد الإلكتروني" className={input} dir="ltr" />
         <input name="password" type="password" required minLength={6} placeholder="كلمة المرور" className={input} dir="ltr" />
         <button disabled={busy} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">

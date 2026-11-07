@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { useCart } from "@/lib/cart";
 import { useCustomer } from "@/lib/customer";
 import { OrderTracker } from "@/components/OrderTracker";
-import { WA_NUMBER, orderMessage, waLink } from "@/lib/store";
+import { PHONE_PATTERN, WA_NUMBER, orderMessage, waLink } from "@/lib/store";
+import { useShopConfig } from "@/lib/config";
 import { fmt } from "@/lib/products";
 
 export const Route = createFileRoute("/cart")({
@@ -34,8 +35,17 @@ function CartPage() {
   const { data: products = [] } = useProducts();
   const { session, customer, loading: custLoading } = useCustomer();
   const canOrder = customer?.status === "approved";
+  const { data: cfg } = useShopConfig();
+  const [zone, setZone] = useState("");
+  const disc = Number(customer?.discount_percent ?? 0);
+  const zones = cfg?.zones ?? {};
+  const zoneNames = Object.keys(zones);
+  const minOrder = cfg?.minOrder ?? 0;
   const items = products.filter((p) => cart[p.id]).map((p) => ({ p, qty: cart[p.id] ?? 0 }));
-  const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty) * qty, 0);
+  const total = items.reduce((s, { p, qty }) => s + unitPrice(p, qty, disc) * qty, 0);
+  const fee = zoneNames.length ? Number(zones[zone] ?? 0) : 0;
+  const grand = total + fee;
+  const belowMin = minOrder > 0 && total < minOrder;
 
   if (done) return (
     <main className="mx-auto max-w-lg px-4 py-20 text-center">
@@ -64,7 +74,7 @@ function CartPage() {
                 <img src={imgSrc(p.image)} alt={p.name} loading="lazy" className="h-20 w-20 rounded-xl object-cover" />
                 <div className="flex-1">
                   <div className="font-bold leading-snug">{p.name}</div>
-                  <div className="text-sm text-muted-foreground"><Price usd={unitPrice(p, qty)} usdToo={false} /> للقطعة {qty >= 10 && "· سعر جملة"}</div>
+                  <div className="text-sm text-muted-foreground"><Price usd={unitPrice(p, qty, disc)} usdToo={false} /> للقطعة {qty >= 10 && "· سعر جملة"}</div>
                   <div className="mt-2 flex items-center gap-2">
                     <button className="h-8 w-8 rounded-full bg-muted" onClick={() => set(p.id, qty - 1)}>−</button>
                     <span className="w-6 text-center font-bold">{qty}</span>
@@ -72,7 +82,7 @@ function CartPage() {
                   </div>
                 </div>
                 <div className="text-left">
-                  <Price usd={unitPrice(p, qty) * qty} className="block font-black" />
+                  <Price usd={unitPrice(p, qty, disc) * qty} className="block font-black" />
                   <button aria-label="حذف" onClick={() => set(p.id, 0)} className="mt-2 text-destructive"><Trash2 className="h-4 w-4" /></button>
                 </div>
               </div>
@@ -89,18 +99,26 @@ function CartPage() {
               const { data: id, error } = await supabase.rpc("place_order", {
                 p_name: String(f.get("name")), p_phone: String(f.get("phone")), p_address: String(f.get("address")),
                 p_items: items.map(({ p, qty }) => ({ id: p.id, qty })),
+                p_zone: zoneNames.length ? zone : null,
               });
               setBusy(false);
               if (error) {
-                toast.error(error.message.includes("account not approved") ? "حسابك بانتظار الموافقة" : error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
+                toast.error(error.message.includes("account not approved") ? "حسابك بانتظار الموافقة" : error.message.includes("below minimum") ? "الطلب أقل من الحد الأدنى" : error.message.includes("zone required") ? "اختر منطقة التوصيل" : error.message.includes("product unavailable") ? "أحد المنتجات لم يعد متوفرًا، حدّث السلة" : "تعذر إرسال الطلب، تأكد من البيانات وحاول مجددًا");
                 return;
               }
-              setWaText(orderMessage(String(id), String(f.get("name")), items.map(({ p, qty }) => ({ name: p.name, qty })), fmt(total)));
+              setWaText(orderMessage(String(id), String(f.get("name")), items.map(({ p, qty }) => ({ name: p.name, qty })), fmt(grand)));
               setOrderId(String(id)); clear(); setDone(true);
             }}
             className="h-fit space-y-3 rounded-2xl bg-secondary p-5"
           >
-            <div className="flex justify-between text-lg"><span>الإجمالي</span><b className="text-left"><Price usd={total} /></b></div>
+            {(disc > 0 || fee > 0) && (
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <div className="flex justify-between"><span>المجموع</span><Price usd={total} usdToo={false} /></div>
+                {disc > 0 && <div>خصم حسابك مطبّق: {disc}%</div>}
+                {fee > 0 && <div className="flex justify-between"><span>رسوم التوصيل</span><Price usd={fee} usdToo={false} /></div>}
+              </div>
+            )}
+            <div className="flex justify-between text-lg"><span>الإجمالي</span><b className="text-left"><Price usd={grand} /></b></div>
             {!canOrder && !custLoading && (
               <div className="rounded-xl bg-card p-3 text-sm">
                 {!session ? (
@@ -109,11 +127,18 @@ function CartPage() {
                 : "حسابك قيد المراجعة. جهّز سلتك، وسنراسلك على واتساب عند الموافقة لإكمال الطلب."}
               </div>
             )}
+            {belowMin && <div className="rounded-xl bg-card p-3 text-sm text-destructive">الحد الأدنى للطلب <Price usd={minOrder} usdToo={false} /> — أضف منتجات بقيمة <Price usd={minOrder - total} usdToo={false} /> لتتمكن من الإرسال.</div>}
+            {zoneNames.length > 0 && (
+              <select name="zone" required value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-xl border border-input bg-card px-3 py-2">
+                <option value="" disabled>اختر منطقة التوصيل</option>
+                {zoneNames.map((z) => <option key={z} value={z}>{z} — {fmt(Number(zones[z]))}</option>)}
+              </select>
+            )}
             <input name="name" required defaultValue={customer?.clinic_name} placeholder="اسم العيادة / الطبيب" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
-            <input name="phone" required defaultValue={customer?.phone} type="tel" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
+            <input name="phone" required defaultValue={customer?.phone} type="tel" pattern={PHONE_PATTERN} title="أرقام لاتينية فقط، مثال 0944123456" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <input name="address" required defaultValue={customer?.address} placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <p className="text-xs text-muted-foreground">يُحتسب السعر النهائي بسعر الصرف لحظة تأكيد الطلب.</p>
-            <button disabled={busy || !canOrder} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
+            <button disabled={busy || !canOrder || belowMin || (zoneNames.length > 0 && !zone)} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
           </form>
         </div>
       )}

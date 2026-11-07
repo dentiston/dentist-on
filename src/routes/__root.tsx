@@ -16,6 +16,7 @@ import { CartProvider } from "@/lib/cart";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Toaster } from "@/components/ui/sonner";
 import { IntroSplash } from "@/components/IntroSplash";
+import { THEME_SCRIPT, useDark } from "@/lib/theme";
 
 function NotFoundComponent() {
   return (
@@ -87,6 +88,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
+    scripts: [{ children: THEME_SCRIPT }],
     links: [
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" },
@@ -105,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="ar" dir="rtl">
+    <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
@@ -119,6 +121,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const { dark } = useDark();
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -128,7 +131,7 @@ function RootComponent() {
         <SiteHeader />
         <Outlet />
         <footer className="mt-10 border-t border-border py-8 text-center text-sm text-muted-foreground">© Dentist On — For Dental Material</footer>
-        <Toaster position="top-center" />
+        <Toaster position="top-center" theme={dark ? "dark" : "light"} />
       </CartProvider>
     </QueryClientProvider>
   );
