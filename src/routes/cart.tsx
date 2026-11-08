@@ -10,7 +10,7 @@ import { useCart } from "@/lib/cart";
 import { useCustomer } from "@/lib/customer";
 import { AskMaterial } from "@/components/AskMaterial";
 import { OrderTracker } from "@/components/OrderTracker";
-import { PHONE_PATTERN, WA_NUMBER, orderMessage, waLink } from "@/lib/store";
+import { PHONE_PATTERN, orderMessage, useWaNumber, waLink } from "@/lib/store";
 import { useShopConfig } from "@/lib/config";
 import { fmt } from "@/lib/products";
 
@@ -40,6 +40,7 @@ function CartPage() {
   const { session, customer, loading: custLoading } = useCustomer();
   const canOrder = customer?.status === "approved";
   const { data: cfg } = useShopConfig();
+  const { data: waNumber = "" } = useWaNumber();
   const [zone, setZone] = useState("");
   const disc = Number(customer?.discount_percent ?? 0);
   const zones = cfg?.zones ?? {};
@@ -73,8 +74,8 @@ function CartPage() {
       <p className="mt-3 text-muted-foreground">سنتواصل معك لتأكيد التوصيل.</p>
       {orderId && <p className="mt-2 text-sm text-muted-foreground">رقم الطلب: <b dir="ltr">{orderId.slice(0, 8).toUpperCase()}</b></p>}
       <p className="mt-2 text-sm text-muted-foreground">يمكنك متابعة حالة الطلب في قسم «تتبع طلبك» أسفل صفحة السلة.</p>
-      {WA_NUMBER && waText && (
-        <a href={waLink(waText)} target="_blank" rel="noreferrer" className="mt-6 block rounded-full bg-accent px-6 py-3 font-bold text-accent-foreground">أرسل تفاصيل الطلب عبر واتساب لتسريع التأكيد</a>
+      {waNumber && waText && (
+        <a href={waLink(waNumber, waText)} target="_blank" rel="noreferrer" className="mt-6 block rounded-full bg-accent px-6 py-3 font-bold text-accent-foreground">أرسل تفاصيل الطلب عبر واتساب لتسريع التأكيد</a>
       )}
       <button onClick={() => setDone(false)} className="mt-3 block w-full rounded-full bg-muted px-6 py-3 font-bold">تتبع طلبك</button>
       <Link to="/" className="mt-3 inline-block rounded-full bg-primary px-6 py-3 font-bold text-primary-foreground">متابعة التسوق</Link>
