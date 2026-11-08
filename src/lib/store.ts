@@ -1,7 +1,23 @@
-// رقم واتساب المتجر بالصيغة الدولية بلا + (مثال: 963944000000). يُضبط في VITE_WHATSAPP_NUMBER.
-export const WA_NUMBER = String(import.meta.env["VITE_WHATSAPP_NUMBER"] ?? "").replace(/\D/g, "");
+// رقم واتساب المتجر بالصيغة الدولية بلا + (مثال: 963944000000). يُخزَّن في store_settings بمفتاح whatsapp.
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-export const waLink = (text: string) => `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(text)}`;
+export const waQuery = {
+  queryKey: ["store_whatsapp"],
+  staleTime: 5 * 60_000,
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("store_settings")
+      .select("value")
+      .eq("key", "whatsapp")
+      .maybeSingle();
+    if (error) throw error;
+    return String(data?.value ?? "").replace(/\D/g, "");
+  },
+};
+export const useWaNumber = () => useQuery(waQuery);
+
+export const waLink = (number: string, text: string) => `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
 
 export function orderMessage(ref: string, name: string, lines: { name: string; qty: number }[], totalLabel: string) {
   return [
