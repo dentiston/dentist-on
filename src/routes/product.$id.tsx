@@ -9,6 +9,7 @@ import { WatchButton } from "@/components/WatchButton";
 import { useCart } from "@/lib/cart";
 import { useDiscounts } from "@/lib/promos";
 import { SITE_URL } from "@/lib/store";
+import { LogoLoader } from "@/components/LogoLoader";
 
 export const Route = createFileRoute("/product/$id")({
   // يُحمَّل المنتج على الخادم ليظهر اسمه وصورته في معاينة واتساب وفي نتائج البحث
@@ -51,7 +52,7 @@ function ProductPage() {
   const { add } = useCart();
   const pctFor = useDiscounts();
   const [qty, setQty] = useState(1);
-  if (isLoading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
+  if (isLoading) return <main><LogoLoader /></main>;
   if (!p) return <main className="py-20 text-center">المنتج غير موجود. <Link to="/" className="font-bold underline">العودة</Link></main>;
   const pct = pctFor(p);
   const out = soldOut(p);

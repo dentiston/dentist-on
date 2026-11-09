@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { LogoLoader } from "@/components/LogoLoader";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -24,7 +25,7 @@ const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 
 function AccountPage() {
   const { session, customer, loading, reload } = useCustomer();
-  if (loading) return <main className="py-20 text-center text-muted-foreground">جارِ التحميل…</main>;
+  if (loading) return <main><LogoLoader /></main>;
   if (!session) return <Auth />;
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">

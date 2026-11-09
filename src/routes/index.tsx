@@ -7,6 +7,7 @@ import { defaultHome, useShopConfig } from "@/lib/config";
 import { useDiscounts } from "@/lib/promos";
 import { FirstOpenSuggest, PreviousItems } from "@/components/PreviousItems";
 import { ProductCard } from "@/components/ProductCard";
+import { LogoLoader } from "@/components/LogoLoader";
 import { WatchAvailable } from "@/components/WatchAvailable";
 import { useBestSellers } from "@/lib/extras";
 
@@ -120,6 +121,7 @@ function Index() {
           </select>
           <input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="أقصى سعر $" aria-label="أقصى سعر" className="col-span-2 rounded-xl border border-input bg-card px-3 py-2 text-sm sm:col-span-1" dir="ltr" />
         </div>
+        {isLoading && <LogoLoader label="جارِ تحميل المنتجات…" />}
         <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           {list.map((p) => <ProductCard key={p.id} p={p} pct={pctFor(p)} />)}
         </div>
