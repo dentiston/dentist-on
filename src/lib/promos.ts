@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { cached, type QCtx } from "@/lib/offline";
 import { useCustomer } from "@/lib/customer";
 import type { Product } from "@/lib/products";
 
@@ -21,16 +22,17 @@ export const autoPercent = (p: Product, promos: Promo[]) =>
   Math.max(0, ...promos.filter((x) => !x.code && isLive(x) && promoMatches(x, p)).map((x) => Number(x.percent)));
 
 // الخصومات التلقائية فقط؛ أكواد القسائم لا تصل للمتصفح إلا عبر التحقق من الكود
-export const usePromotions = () =>
-  useQuery({
-    queryKey: ["promos"],
-    staleTime: 60_000,
-    queryFn: async () => {
+export const promosQuery = {
+  queryKey: ["promos"],
+  staleTime: 60_000,
+  queryFn: ({ meta }: QCtx) =>
+    cached("promos", async () => {
       const { data, error } = await supabase.from("promotions").select("*").is("code", null);
       if (error) throw error;
       return data as unknown as Promo[];
-    },
-  });
+    }, meta),
+};
+export const usePromotions = () => useQuery(promosQuery);
 
 // النسبة الفعلية لمنتج: الأفضل للزبون بين خصمه الخاص والخصومات التلقائية (لا تتراكم)
 export function useDiscounts() {

@@ -1,19 +1,21 @@
 // رقم واتساب المتجر بالصيغة الدولية بلا + (مثال: 963944000000). يُخزَّن في store_settings بمفتاح whatsapp.
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { cached, type QCtx } from "@/lib/offline";
 
 export const waQuery = {
   queryKey: ["store_whatsapp"],
   staleTime: 5 * 60_000,
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from("store_settings")
-      .select("value")
-      .eq("key", "whatsapp")
-      .maybeSingle();
-    if (error) throw error;
-    return String(data?.value ?? "").replace(/\D/g, "");
-  },
+  queryFn: ({ meta }: QCtx) =>
+    cached("store_whatsapp", async () => {
+      const { data, error } = await supabase
+        .from("store_settings")
+        .select("value")
+        .eq("key", "whatsapp")
+        .maybeSingle();
+      if (error) throw error;
+      return String(data?.value ?? "").replace(/\D/g, "");
+    }, meta),
 };
 export const useWaNumber = () => useQuery(waQuery);
 

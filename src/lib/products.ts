@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { cached, type QCtx } from "@/lib/offline";
 import instruments from "@/assets/p-instruments.jpg";
 import composite from "@/assets/p-composite.jpg";
 import handpiece from "@/assets/p-handpiece.jpg";
@@ -25,11 +26,12 @@ export const imgSrc = (img: string) => builtIn[img] ?? img;
 
 export const productsQuery = {
   queryKey: ["products"],
-  queryFn: async () => {
-    const { data, error } = await supabase.from("products").select("*").order("created_at");
-    if (error) throw error;
-    return data as Product[];
-  },
+  queryFn: ({ meta }: QCtx) =>
+    cached("products", async () => {
+      const { data, error } = await supabase.from("products").select("*").order("created_at");
+      if (error) throw error;
+      return data as Product[];
+    }, meta),
 };
 export const useProducts = () => useQuery(productsQuery);
 

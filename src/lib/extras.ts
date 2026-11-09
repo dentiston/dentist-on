@@ -1,20 +1,22 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { cached, type QCtx } from "@/lib/offline";
 
 export const REQUEST_STATUSES = ["جديد", "متوفرة", "غير متوفرة", "ستتوفر قريباً"] as const;
 
 // الأكثر طلباً: عدد القطع المباعة آخر 90 يوماً. إن لم يُنفَّذ SQL بعد، يعمل المتجر بدونها.
-export const useBestSellers = () =>
-  useQuery({
-    queryKey: ["best_sellers"],
-    staleTime: 10 * 60_000,
-    queryFn: async () => {
+export const bestSellersQuery = {
+  queryKey: ["best_sellers"],
+  staleTime: 10 * 60_000,
+  queryFn: ({ meta }: QCtx) =>
+    cached("best_sellers", async () => {
       const { data, error } = await supabase.rpc("best_sellers");
-      if (error) return {} as Record<string, number>;
+      if (error) throw error;
       return Object.fromEntries((data ?? []).map((r) => [r.product_id, Number(r.qty)])) as Record<string, number>;
-    },
-  });
+    }, meta).catch(() => ({}) as Record<string, number>),
+};
+export const useBestSellers = () => useQuery(bestSellersQuery);
 
 // قائمة «أعلمني عند التوفر» للزبون الحالي
 export function useWatch(userId?: string) {

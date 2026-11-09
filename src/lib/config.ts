@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { cached, type QCtx } from "@/lib/offline";
 
 export type HomeConfig = {
   announcement: { enabled: boolean; text: string };
@@ -26,7 +27,7 @@ export type ShopConfig = { minOrder: number; zones: Record<string, number>; lowS
 export const configQuery = {
   queryKey: ["shop_config"],
   staleTime: 60_000,
-  queryFn: async (): Promise<ShopConfig> => {
+  queryFn: ({ meta }: QCtx) => cached("shop_config", async (): Promise<ShopConfig> => {
     const { data, error } = await supabase.from("shop_config").select("key, value");
     if (error) throw error;
     const m: Record<string, unknown> = Object.fromEntries((data ?? []).map((r) => [r.key, r.value]));
@@ -44,6 +45,6 @@ export const configQuery = {
       lowStock: Number(m["low_stock_threshold"] ?? 5) || 0,
       home,
     };
-  },
+  }, meta),
 };
 export const useShopConfig = () => useQuery(configQuery);
