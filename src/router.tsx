@@ -3,7 +3,8 @@ import { createRouter } from "@tanstack/react-router";
 import { routeTree } from "./routeTree.gen";
 
 export const getRouter = () => {
-  const queryClient = new QueryClient();
+  // offlineFirst: لا توقف react-query الجلب عند انقطاع الاتصال، فتعمل دوال الجلب بلقطة «التسوق دون اتصال»
+  const queryClient = new QueryClient({ defaultOptions: { queries: { networkMode: "offlineFirst" } } });
 
   const router = createRouter({
     routeTree,
