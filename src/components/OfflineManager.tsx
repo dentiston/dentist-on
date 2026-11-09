@@ -9,6 +9,7 @@ import { clearOffline, readMeta, type OfflineMeta } from "@/lib/offline";
 import { downloadStore } from "@/lib/offline-download";
 import { offlineSupported } from "@/lib/use-online";
 import { useProducts } from "@/lib/products";
+import { LogoLoader } from "@/components/LogoLoader";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -107,8 +108,8 @@ export function OfflineManager() {
             )}
             {running && (
               <div className="space-y-2">
+                <LogoLoader label={label} className="py-2" />
                 <Progress value={pct} />
-                <div className="text-muted-foreground">{label}</div>
               </div>
             )}
             <p className="text-xs text-muted-foreground">إرسال الطلب وكود الخصم يحتاجان اتصالاً. السلة تُحفظ على جهازك، وتُزامَن مع حسابك بعد تأكيدك.</p>
