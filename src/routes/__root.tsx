@@ -17,6 +17,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { Toaster } from "@/components/ui/sonner";
 import { IntroSplash } from "@/components/IntroSplash";
 import { AskMaterial } from "@/components/AskMaterial";
+import { OfflineManager } from "@/components/OfflineManager";
+import { isPreviewEnv } from "@/lib/offline";
 import { THEME_SCRIPT, useDark } from "@/lib/theme";
 
 function NotFoundComponent() {
@@ -129,9 +131,7 @@ function RootComponent() {
 
   // PWA: تسجيل service worker (خارج المعاينة والإطارات)
   useEffect(() => {
-    if (!import.meta.env.PROD || !("serviceWorker" in navigator) || window.self !== window.top) return;
-    const h = window.location.hostname;
-    if (h.includes("lovableproject.com") || h.startsWith("id-preview")) return;
+    if (!import.meta.env.PROD || !("serviceWorker" in navigator) || isPreviewEnv()) return;
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }, []);
 
@@ -143,6 +143,7 @@ function RootComponent() {
         <SiteHeader />
         <Outlet />
         <AskMaterial />
+        <OfflineManager />
         <footer className="mt-10 border-t border-border py-8 text-center text-sm text-muted-foreground">© Dentist On — For Dental Material</footer>
         <Toaster position="top-center" theme={dark ? "dark" : "light"} />
       </CartProvider>

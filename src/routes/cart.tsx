@@ -13,6 +13,7 @@ import { OrderTracker } from "@/components/OrderTracker";
 import { PHONE_PATTERN, orderMessage, useWaNumber, waLink } from "@/lib/store";
 import { useShopConfig } from "@/lib/config";
 import { fmt } from "@/lib/products";
+import { useOnline } from "@/lib/use-online";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -41,6 +42,7 @@ function CartPage() {
   const canOrder = customer?.status === "approved";
   const { data: cfg } = useShopConfig();
   const { data: waNumber = "" } = useWaNumber();
+  const online = useOnline();
   const [zone, setZone] = useState("");
   const disc = Number(customer?.discount_percent ?? 0);
   const zones = cfg?.zones ?? {};
@@ -58,6 +60,7 @@ function CartPage() {
   const applyCoupon = async () => {
     const c = code.trim().toUpperCase();
     if (!c) return;
+    if (!online) { toast.error("التحقق من كود الخصم يحتاج اتصالاً بالإنترنت"); return; }
     const { data, error } = await supabase.rpc("check_coupon", { p_code: c });
     const row = Array.isArray(data) ? data[0] : null;
     if (error || !row) { setCoupon(null); toast.error("كود الخصم غير صالح أو منتهٍ"); return; }
@@ -117,6 +120,7 @@ function CartPage() {
             onSubmit={async (e) => {
               e.preventDefault();
               if (!canOrder) return;
+              if (!online) { toast.error("لا يوجد اتصال. سلتك محفوظة، أرسل الطلب عند عودة الاتصال"); return; }
               const f = new FormData(e.currentTarget);
               setBusy(true);
               // الخادم يعيد حساب الأسعار وسعر الصرف؛ نرسل فقط المعرّف والكمية
@@ -152,6 +156,7 @@ function CartPage() {
                 : "حسابك قيد المراجعة. جهّز سلتك، وسنراسلك على واتساب عند الموافقة لإكمال الطلب."}
               </div>
             )}
+            {!online && <div className="rounded-xl bg-card p-3 text-sm">أنت دون اتصال. سلتك محفوظة على جهازك، ويمكنك إرسال الطلب عند عودة الاتصال.</div>}
             {belowMin && <div className="rounded-xl bg-card p-3 text-sm text-destructive">الحد الأدنى للطلب <Price usd={minOrder} usdToo={false} /> — أضف منتجات بقيمة <Price usd={minOrder - total} usdToo={false} /> لتتمكن من الإرسال.</div>}
             {zoneNames.length > 0 && (
               <select name="zone" required value={zone} onChange={(e) => setZone(e.target.value)} className="w-full rounded-xl border border-input bg-card px-3 py-2">
@@ -171,7 +176,7 @@ function CartPage() {
             <input name="phone" required defaultValue={customer?.phone} type="tel" pattern={PHONE_PATTERN} title="أرقام لاتينية فقط، مثال 0944123456" placeholder="رقم الهاتف" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <input name="address" required defaultValue={customer?.address} placeholder="العنوان" className="w-full rounded-xl border border-input bg-card px-3 py-2" />
             <p className="text-xs text-muted-foreground">يُحتسب السعر النهائي بسعر الصرف لحظة تأكيد الطلب.</p>
-            <button disabled={busy || !canOrder || belowMin || couponBelowMin || (zoneNames.length > 0 && !zone)} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
+            <button disabled={busy || !online || !canOrder || belowMin || couponBelowMin || (zoneNames.length > 0 && !zone)} className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground disabled:opacity-60">{busy ? "جارِ الإرسال…" : "تأكيد الطلب"}</button>
           </form>
         </div>
       )}
