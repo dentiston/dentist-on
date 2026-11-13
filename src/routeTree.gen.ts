@@ -13,9 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CartRouteImport } from './routes/cart'
-import { Route as UsedRouteImport } from './routes/used'
-import { Route as TrackRouteImport } from './routes/track'
 import { Route as OffersRouteImport } from './routes/offers'
+import { Route as TrackRouteImport } from './routes/track'
+import { Route as UsedRouteImport } from './routes/used'
 import { Route as ProductIdRouteImport } from './routes/product.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -38,11 +38,6 @@ const CartRoute = CartRouteImport.update({
   path: '/cart',
   getParentRoute: () => rootRouteImport,
 } as any)
-const UsedRoute = UsedRouteImport.update({
-  id: '/used',
-  path: '/used',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const OffersRoute = OffersRouteImport.update({
   id: '/offers',
   path: '/offers',
@@ -51,6 +46,11 @@ const OffersRoute = OffersRouteImport.update({
 const TrackRoute = TrackRouteImport.update({
   id: '/track',
   path: '/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsedRoute = UsedRouteImport.update({
+  id: '/used',
+  path: '/used',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProductIdRoute = ProductIdRouteImport.update({
@@ -64,8 +64,8 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/track': typeof TrackRoute
   '/offers': typeof OffersRoute
+  '/track': typeof TrackRoute
   '/used': typeof UsedRoute
   '/product/$id': typeof ProductIdRoute
 }
@@ -74,8 +74,8 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/track': typeof TrackRoute
   '/offers': typeof OffersRoute
+  '/track': typeof TrackRoute
   '/used': typeof UsedRoute
   '/product/$id': typeof ProductIdRoute
 }
@@ -85,24 +85,40 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/admin': typeof AdminRoute
   '/cart': typeof CartRoute
-  '/track': typeof TrackRoute
   '/offers': typeof OffersRoute
+  '/track': typeof TrackRoute
   '/used': typeof UsedRoute
   '/product/$id': typeof ProductIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/account' | '/admin' | '/cart' | '/track' | '/offers' | '/used' | '/product/$id'
+  fullPaths:
+    | '/'
+    | '/account'
+    | '/admin'
+    | '/cart'
+    | '/offers'
+    | '/track'
+    | '/used'
+    | '/product/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/account' | '/admin' | '/cart' | '/track' | '/offers' | '/used' | '/product/$id'
+  to:
+    | '/'
+    | '/account'
+    | '/admin'
+    | '/cart'
+    | '/offers'
+    | '/track'
+    | '/used'
+    | '/product/$id'
   id:
     | '__root__'
     | '/'
     | '/account'
     | '/admin'
     | '/cart'
-    | '/track'
     | '/offers'
+    | '/track'
     | '/used'
     | '/product/$id'
   fileRoutesById: FileRoutesById
@@ -112,8 +128,8 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   AdminRoute: typeof AdminRoute
   CartRoute: typeof CartRoute
-  TrackRoute: typeof TrackRoute
   OffersRoute: typeof OffersRoute
+  TrackRoute: typeof TrackRoute
   UsedRoute: typeof UsedRoute
   ProductIdRoute: typeof ProductIdRoute
 }
@@ -148,18 +164,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CartRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/track': {
-      id: '/track'
-      path: '/track'
-      fullPath: '/track'
-      preLoaderRoute: typeof TrackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/offers': {
       id: '/offers'
       path: '/offers'
       fullPath: '/offers'
       preLoaderRoute: typeof OffersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/track': {
+      id: '/track'
+      path: '/track'
+      fullPath: '/track'
+      preLoaderRoute: typeof TrackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/used': {
@@ -184,8 +200,8 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   AdminRoute: AdminRoute,
   CartRoute: CartRoute,
-  TrackRoute: TrackRoute,
   OffersRoute: OffersRoute,
+  TrackRoute: TrackRoute,
   UsedRoute: UsedRoute,
   ProductIdRoute: ProductIdRoute,
 }
