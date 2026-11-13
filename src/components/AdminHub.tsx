@@ -8,6 +8,10 @@ import { AUDIENCES, BUNDLE_CATEGORY, bundleValue, isBundle, type Audience, type 
 import { genCode, normCode, refLink, refMessage } from "@/lib/referral";
 import { waLinkTo } from "@/lib/store";
 import { SERVICE_STATUSES } from "@/components/ServiceRequests";
+import { defaultAbout, useAbout, type AboutConfig } from "@/lib/about";
+import { useProducts as useProductsForReviews } from "@/lib/products";
+import { Stars } from "@/components/ProductReviews";
+import type { Review } from "@/lib/reviews";
 
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 const btn = "rounded-full px-4 py-1.5 text-sm font-bold";
@@ -368,5 +372,69 @@ function ServiceCard({ r, cust }: { r: SRow; cust?: { clinic_name: string; phone
         <button className="text-destructive" aria-label="حذف" onClick={async () => { if (!confirm("حذف هذا الطلب؟")) return; const { error } = await sb.from("service_requests").delete().eq("id", r.id); if (error) toast.error(error.message); else refresh(); }}><Trash2 className="h-4 w-4" /></button>
       </div>
     </div>
+  );
+}
+
+// ---------- من نحن والتوصيل (يظهر في /about) ----------
+export function AboutEditor() {
+  const qc = useQueryClient();
+  const { data } = useAbout();
+  const [f, setF] = useState<AboutConfig | null>(null);
+  const v = f ?? data ?? defaultAbout;
+  const set = (k: keyof AboutConfig, x: string) => setF({ ...v, [k]: x });
+  return (
+    <section className="mt-8 max-w-md">
+      <div className="rounded-2xl bg-secondary p-5">
+        <div className="font-bold">صفحة «من نحن والتوصيل»</div>
+        <p className="mt-1 text-xs text-muted-foreground">المناطق والرسوم والحد الأدنى تُؤخذ من «قواعد الطلب». الحقول الفارغة لا تظهر للزبائن.</p>
+        <form className="mt-3 space-y-3" onSubmit={async (e) => {
+          e.preventDefault();
+          const { error } = await sb.from("shop_config").upsert({ key: "about", value: v });
+          if (error) { toast.error(error.message); return; }
+          toast.success("تم الحفظ"); setF(null); qc.invalidateQueries({ queryKey: ["shop_about"] });
+        }}>
+          <label className="block text-sm">نبذة عن المتجر<textarea rows={3} value={v.intro} onChange={(e) => set("intro", e.target.value)} className={input} /></label>
+          <label className="block text-sm">مدة التوصيل (مثال: خلال 24–48 ساعة)<input value={v.deliveryTime} onChange={(e) => set("deliveryTime", e.target.value)} className={input} /></label>
+          <label className="block text-sm">ملاحظات التوصيل<textarea rows={2} value={v.deliveryNote} onChange={(e) => set("deliveryNote", e.target.value)} className={input} /></label>
+          <label className="block text-sm">ساعات العمل<input value={v.hours} onChange={(e) => set("hours", e.target.value)} className={input} /></label>
+          <label className="block text-sm">العنوان<input value={v.address} onChange={(e) => set("address", e.target.value)} className={input} /></label>
+          <button className="w-full rounded-full bg-primary py-3 font-bold text-primary-foreground">حفظ</button>
+        </form>
+      </div>
+    </section>
+  );
+}
+
+// ---------- مراجعة التقييمات ----------
+export function ReviewsAdmin() {
+  const qc = useQueryClient();
+  const { data: products = [] } = useProductsForReviews();
+  const { data = [] } = useQuery({
+    queryKey: ["admin-reviews"],
+    queryFn: async () => {
+      const { data, error } = await sb.from("product_reviews").select("*").order("created_at", { ascending: false }).limit(200);
+      if (error) throw error;
+      return (data ?? []) as Review[];
+    },
+  });
+  const refresh = () => { qc.invalidateQueries({ queryKey: ["admin-reviews"] }); qc.invalidateQueries({ queryKey: ["review_stats"] }); qc.invalidateQueries({ queryKey: ["reviews"] }); };
+  return (
+    <section className="mt-6 space-y-3">
+      {data.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد تقييمات.</p>}
+      {data.map((r) => (
+        <div key={r.id} className={`rounded-2xl border border-border bg-card p-4 ${r.hidden ? "opacity-60" : ""}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div><b>{r.author || "—"}</b> <span className="text-sm text-muted-foreground">على {products.find((p) => p.id === r.product_id)?.name ?? r.product_id}</span></div>
+            <Stars value={r.rating} />
+          </div>
+          {r.comment && <p className="mt-1 text-sm">{r.comment}</p>}
+          <div className="mt-2 flex items-center gap-3 text-sm">
+            <span className="text-xs text-muted-foreground">{r.verified ? "مشترٍ للمنتج · " : ""}{new Date(r.created_at).toLocaleDateString("ar")}</span>
+            <button className="font-bold underline" onClick={async () => { const { error } = await sb.from("product_reviews").update({ hidden: !r.hidden }).eq("id", r.id); if (error) toast.error(error.message); else refresh(); }}>{r.hidden ? "إظهار" : "إخفاء"}</button>
+            <button className="text-destructive" aria-label="حذف" onClick={async () => { if (!confirm("حذف التقييم؟")) return; const { error } = await sb.from("product_reviews").delete().eq("id", r.id); if (error) toast.error(error.message); else refresh(); }}><Trash2 className="h-4 w-4" /></button>
+          </div>
+        </div>
+      ))}
+    </section>
   );
 }

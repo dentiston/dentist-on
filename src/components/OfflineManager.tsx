@@ -4,7 +4,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { CloudDownload, RefreshCw, Trash2, WifiOff } from "lucide-react";
 import { toast } from "sonner";
 import { useCart, type SyncMode } from "@/lib/cart";
-import { diffCart } from "@/lib/cart-sync";
+import { diffCart, needsSyncConfirm } from "@/lib/cart-sync";
 import { clearOffline, readMeta, type OfflineMeta } from "@/lib/offline";
 import { downloadStore } from "@/lib/offline-download";
 import { offlineSupported } from "@/lib/use-online";
@@ -37,7 +37,7 @@ export function OfflineManager() {
   useEffect(() => { setSupported(offlineSupported()); void refreshStats(); }, []);
 
   // عند عودة الاتصال مع تغييرات معلّقة: تنبيه يفتح نافذة المراجعة
-  const needsConfirm = sync.loggedIn && sync.online && sync.pending && !!sync.serverCart;
+  const needsConfirm = needsSyncConfirm(sync);
   useEffect(() => {
     if (!needsConfirm) return;
     toast("عاد الاتصال. أكّد مزامنة سلتك مع حسابك", { id: "cart-sync", duration: 10000, action: { label: "مراجعة", onClick: () => setSyncOpen(true) } });

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { type Product, imgSrc, soldOut, unitPrice } from "@/lib/products";
 import { Price } from "@/components/Price";
 import { useCart } from "@/lib/cart";
+import { RatingBadge } from "@/components/ProductReviews";
 
 export function ProductCard({ p, pct = 0 }: { p: Product; pct?: number }) {
   const { add } = useCart();
@@ -16,6 +17,7 @@ export function ProductCard({ p, pct = 0 }: { p: Product; pct?: number }) {
       <div className="flex flex-1 flex-col gap-1 p-4">
         <span className="text-xs font-semibold text-muted-foreground">{p.brand}{soldOut(p) && <b className="mr-2 text-destructive">نفد</b>}</span>
         <Link to="/product/$id" params={{ id: p.id }} className="line-clamp-2 font-bold leading-snug">{p.name}</Link>
+        <RatingBadge id={p.id} />
         <div className="mt-auto flex items-end justify-between pt-3">
           <div>
             <Price usd={unitPrice(p, 1, pct)} className="block text-lg font-black" />
