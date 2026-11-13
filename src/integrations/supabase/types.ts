@@ -265,6 +265,50 @@ export type Database = {
         }
         Relationships: []
       }
+      product_reviews: {
+        Row: {
+          author: string
+          comment: string
+          created_at: string
+          hidden: boolean
+          id: string
+          product_id: string
+          rating: number
+          user_id: string
+          verified: boolean
+        }
+        Insert: {
+          author?: string
+          comment?: string
+          created_at?: string
+          hidden?: boolean
+          id?: string
+          product_id: string
+          rating: number
+          user_id: string
+          verified?: boolean
+        }
+        Update: {
+          author?: string
+          comment?: string
+          created_at?: string
+          hidden?: boolean
+          id?: string
+          product_id?: string
+          rating?: number
+          user_id?: string
+          verified?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
@@ -638,6 +682,18 @@ export type Database = {
           p_phone: string
           p_zone?: string
         }
+        Returns: string
+      }
+      review_stats: {
+        Args: never
+        Returns: {
+          avg_rating: number
+          n: number
+          product_id: string
+        }[]
+      }
+      submit_review: {
+        Args: { p_comment: string; p_product: string; p_rating: number }
         Returns: string
       }
       submit_service_request: {
