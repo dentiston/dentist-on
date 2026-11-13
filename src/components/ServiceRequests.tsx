@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { PackagePlus, Wrench, MessageCircle } from "lucide-react";
+import { PackagePlus, MessageCircle } from "lucide-react";
 import { sb, uploadUserImage } from "@/lib/db";
 import { useCustomer } from "@/lib/customer";
 import { ordersLink } from "@/lib/contacts";
@@ -151,24 +151,16 @@ export function MyServiceRequests() {
   );
 }
 
-// قسم «طلبات إضافية» داخل صفحة السلة: مستلزمات من خارج المتجر + الصيانة
+// قسم «طلبات إضافية» داخل صفحة السلة: مستلزمات من خارج المتجر فقط (الصيانة تُطلب مباشرة عبر واتساب من اللوحة الجانبية)
 export function ExtraRequestsSection() {
-  const [kind, setKind] = useState<Kind>("outside");
   useEffect(() => {
     if (window.location.hash === "#extras") setTimeout(() => document.getElementById("extras")?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
   }, []);
-  const tab = (k: Kind, label: string, Icon: typeof Wrench) => (
-    <button type="button" onClick={() => setKind(k)} aria-pressed={kind === k}
-      className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition ${kind === k ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-      <Icon className="h-4 w-4" /> {label}
-    </button>
-  );
   return (
     <section id="extras" className="mt-12 scroll-mt-28 rounded-3xl border border-border bg-card p-5">
-      <h2 className="text-2xl font-black">طلبات إضافية</h2>
-      <p className="mt-1 text-sm text-muted-foreground">تحتاج شيئاً غير موجود في المتجر؟ اطلبه من أي مكان ونوصله لك، أو اطلب صيانة لأجهزتك.</p>
-      <div className="mt-4 flex gap-2">{tab("outside", "مستلزمات من خارج المتجر", PackagePlus)}{tab("maintenance", "طلب صيانة", Wrench)}</div>
-      <div className="mt-4 max-w-xl"><RequestForm key={kind} kind={kind} /></div>
+      <h2 className="flex items-center gap-2 text-2xl font-black"><PackagePlus className="h-6 w-6" /> طلبات إضافية</h2>
+      <p className="mt-1 text-sm text-muted-foreground">تحتاج شيئاً غير موجود في المتجر؟ اطلبه من أي مكان ونوصله لك.</p>
+      <div className="mt-4 max-w-xl"><RequestForm kind="outside" /></div>
       <MyServiceRequests />
     </section>
   );

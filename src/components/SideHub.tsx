@@ -5,14 +5,12 @@ import { useCustomer } from "@/lib/customer";
 import { useProducts } from "@/lib/products";
 import { isBundle } from "@/lib/bundles";
 import { ORDERS_PHONE, SUPPORT_PHONE, ordersLink, supportLink } from "@/lib/contacts";
-import { ServiceRequestDialog, type Kind } from "@/components/ServiceRequests";
 
 export const openHub = () => window.dispatchEvent(new Event("hub:open"));
 
 // مفتاح كهرباء على حافة الشاشة (كمفتاح شاشة البداية): اسحبه أو اضغطه فتضيء لوحة الأقسام.
 export function SideHub() {
   const [open, setOpen] = useState(false);
-  const [dlg, setDlg] = useState<Kind | null>(null);
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { customer } = useCustomer();
   const { data: products = [] } = useProducts();
@@ -106,12 +104,12 @@ export function SideHub() {
             <span className="mt-3 block font-black">طلبات إضافية</span>
             <span className="mt-1 block text-xs text-muted-foreground">مواد من خارج المتجر نوصلها لك.</span>
           </Tile>
-          <Tile close={close} n={3} wide onClick={() => setDlg("maintenance")}>
+          <Tile close={close} n={3} wide href={ordersLink("طلب صيانة", who)}>
             <span className="flex items-center gap-3">
               <span className="hub-ico"><Wrench className="h-5 w-5" /></span>
               <span>
                 <span className="block font-black">الصيانة</span>
-                <span className="block text-xs text-muted-foreground">صيانة القبضات والأجهزة والمعدات، اطلبها بضغطة.</span>
+                <span className="block text-xs text-muted-foreground">صيانة القبضات والأجهزة والمعدات، اطلبها مباشرة عبر واتساب.</span>
               </span>
             </span>
           </Tile>
@@ -121,25 +119,25 @@ export function SideHub() {
           <div className="mb-2 flex items-center gap-2 text-sm font-black"><Headset className="h-4 w-4" /> تواصل مباشر عبر واتساب</div>
           <div className="space-y-2">
             <WaButton href={supportLink(who)} title="الشكاوى والدعم" phone={SUPPORT_PHONE} />
-            <WaButton href={ordersLink("طلب مباشر / متابعة طلب / طلب صيانة", who)} title="طلب مباشر · متابعة الطلب · الصيانة" phone={ORDERS_PHONE} />
+            <WaButton href={ordersLink("طلب مباشر / متابعة طلب", who)} title="طلب مباشر · متابعة الطلب" phone={ORDERS_PHONE} />
           </div>
         </div>
       </aside>
 
-      <ServiceRequestDialog kind={dlg ?? "maintenance"} open={dlg !== null} onOpenChange={(o) => { if (!o) setDlg(null); }} />
     </>
   );
 }
 
-type TileProps = { n: number; wide?: boolean; tall?: boolean; children: ReactNode; to?: "/offers" | "/used" | "/cart"; hash?: string; onClick?: () => void; close: () => void };
+type TileProps = { n: number; wide?: boolean; tall?: boolean; children: ReactNode; to?: "/offers" | "/used" | "/cart"; hash?: string; href?: string; onClick?: () => void; close: () => void };
 const idx = (n: number): CSSProperties => ({ ["--i" as string]: n });
 const spotlight = (e: PointerEvent<HTMLElement>) => {
   const r = e.currentTarget.getBoundingClientRect();
   e.currentTarget.style.setProperty("--mx", `${e.clientX - r.left}px`);
   e.currentTarget.style.setProperty("--my", `${e.clientY - r.top}px`);
 };
-function Tile({ n, wide, tall, children, to, hash, onClick, close }: TileProps) {
+function Tile({ n, wide, tall, children, to, hash, href, onClick, close }: TileProps) {
   const cls = `hub-tile ${wide ? "col-span-2" : ""} ${tall ? "min-h-[150px]" : "min-h-[118px]"}`;
+  if (href) return <a href={href} target="_blank" rel="noreferrer" onClick={close} onPointerMove={spotlight} style={idx(n)} className={`${cls} text-start`}>{children}</a>;
   if (to) return <Link to={to} {...(hash ? { hash } : {})} onClick={close} onPointerMove={spotlight} style={idx(n)} className={cls}>{children}</Link>;
   return <button type="button" onClick={onClick} onPointerMove={spotlight} style={idx(n)} className={`${cls} text-start`}>{children}</button>;
 }
