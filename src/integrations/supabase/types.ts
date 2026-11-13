@@ -75,6 +75,7 @@ export type Database = {
           clinic_name: string
           created_at: string
           discount_percent: number
+          distributor_id: string | null
           phone: string
           status: string
           user_id: string
@@ -85,6 +86,7 @@ export type Database = {
           clinic_name?: string
           created_at?: string
           discount_percent?: number
+          distributor_id?: string | null
           phone?: string
           status?: string
           user_id: string
@@ -95,9 +97,48 @@ export type Database = {
           clinic_name?: string
           created_at?: string
           discount_percent?: number
+          distributor_id?: string | null
           phone?: string
           status?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_distributor_id_fkey"
+            columns: ["distributor_id"]
+            isOneToOne: false
+            referencedRelation: "distributors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distributors: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          name: string
+          note: string
+          phone: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          note?: string
+          phone?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          note?: string
+          phone?: string
         }
         Relationships: []
       }
@@ -227,8 +268,10 @@ export type Database = {
       products: {
         Row: {
           active: boolean
+          audience: string | null
           brand: string
           bulk_price: number
+          bundle_items: Json | null
           category: string
           created_at: string
           description: string
@@ -241,8 +284,10 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          audience?: string | null
           brand?: string
           bulk_price?: number
+          bundle_items?: Json | null
           category?: string
           created_at?: string
           description?: string
@@ -255,8 +300,10 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          audience?: string | null
           brand?: string
           bulk_price?: number
+          bundle_items?: Json | null
           category?: string
           created_at?: string
           description?: string
@@ -314,6 +361,57 @@ export type Database = {
           starts_at?: string | null
           target?: string | null
           used_count?: number
+        }
+        Relationships: []
+      }
+      service_requests: {
+        Row: {
+          buy_from: string
+          created_at: string
+          id: string
+          image_url: string | null
+          kind: string
+          note: string
+          qty: number
+          replied_at: string | null
+          reply_note: string
+          reply_price: number | null
+          status: string
+          title: string
+          urgent: boolean
+          user_id: string
+        }
+        Insert: {
+          buy_from?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          kind: string
+          note?: string
+          qty?: number
+          replied_at?: string | null
+          reply_note?: string
+          reply_price?: number | null
+          status?: string
+          title: string
+          urgent?: boolean
+          user_id: string
+        }
+        Update: {
+          buy_from?: string
+          created_at?: string
+          id?: string
+          image_url?: string | null
+          kind?: string
+          note?: string
+          qty?: number
+          replied_at?: string | null
+          reply_note?: string
+          reply_price?: number | null
+          status?: string
+          title?: string
+          urgent?: boolean
+          user_id?: string
         }
         Relationships: []
       }
@@ -403,6 +501,51 @@ export type Database = {
         }
         Relationships: []
       }
+      used_items: {
+        Row: {
+          admin_note: string
+          category: string
+          condition: string
+          created_at: string
+          decided_at: string | null
+          description: string
+          id: string
+          image_urls: string[]
+          price: number | null
+          status: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          admin_note?: string
+          category?: string
+          condition?: string
+          created_at?: string
+          decided_at?: string | null
+          description?: string
+          id?: string
+          image_urls?: string[]
+          price?: number | null
+          status?: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          admin_note?: string
+          category?: string
+          condition?: string
+          created_at?: string
+          decided_at?: string | null
+          description?: string
+          id?: string
+          image_urls?: string[]
+          price?: number | null
+          status?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           id: string
@@ -427,6 +570,10 @@ export type Database = {
     }
     Functions: {
       admin_exists: { Args: never; Returns: boolean }
+      admin_set_distributor: {
+        Args: { p_dist: string; p_user: string }
+        Returns: undefined
+      }
       ask_material: {
         Args: {
           p_brand: string
@@ -437,6 +584,7 @@ export type Database = {
         }
         Returns: string
       }
+      attach_distributor: { Args: { p_code: string }; Returns: boolean }
       audit_trim: { Args: { j: Json }; Returns: Json }
       best_sellers: {
         Args: never
@@ -455,6 +603,12 @@ export type Database = {
           target: string
         }[]
       }
+      distributor_by_code: {
+        Args: { p_code: string }
+        Returns: {
+          name: string
+        }[]
+      }
       has_perm: { Args: { _perm: string; _uid: string }; Returns: boolean }
       has_role: {
         Args: {
@@ -462,6 +616,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      is_approved_customer: { Args: { _uid: string }; Returns: boolean }
+      mark_used_sold: { Args: { p_id: string }; Returns: undefined }
+      my_distributor: {
+        Args: never
+        Returns: {
+          name: string
+        }[]
       }
       notify_admin: {
         Args: { p_message: string; p_title: string }
@@ -475,6 +637,29 @@ export type Database = {
           p_name: string
           p_phone: string
           p_zone?: string
+        }
+        Returns: string
+      }
+      submit_service_request: {
+        Args: {
+          p_buy_from: string
+          p_image: string
+          p_kind: string
+          p_note: string
+          p_qty: number
+          p_title: string
+          p_urgent: boolean
+        }
+        Returns: string
+      }
+      submit_used_item: {
+        Args: {
+          p_category: string
+          p_condition: string
+          p_description: string
+          p_images: string[]
+          p_price: number
+          p_title: string
         }
         Returns: string
       }
