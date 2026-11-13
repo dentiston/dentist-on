@@ -9,6 +9,8 @@ import { fmt } from "@/lib/products";
 import { PHONE_PATTERN } from "@/lib/store";
 import { MyRequests } from "@/components/AskMaterial";
 import { WatchAvailable } from "@/components/WatchAvailable";
+import { MyServiceRequests } from "@/components/ServiceRequests";
+import { readRef, useDistributorName, useMyDistributor } from "@/lib/referral";
 
 export const Route = createFileRoute("/account")({
   head: () => ({
@@ -33,16 +35,23 @@ function AccountPage() {
         <h1 className="text-3xl font-black">{customer?.clinic_name || "حسابي"}</h1>
         <button onClick={() => supabase.auth.signOut()} className="text-sm text-muted-foreground underline">تسجيل الخروج</button>
       </div>
+      {customer && <DistributorChip />}
       {!customer ? (
         <p className="mt-6 rounded-2xl bg-secondary p-4">هذا الحساب غير مسجّل كحساب زبون. <Link to="/admin" className="font-bold underline">لوحة المدير</Link></p>
       ) : (
         <>
           <Status status={customer.status} onRefresh={reload} />
-          {customer.status === "approved" && <><WatchAvailable /><Orders /><MyRequests /></>}
+          {customer.status === "approved" && <><WatchAvailable /><Orders /><MyRequests /><MyServiceRequests /></>}
         </>
       )}
     </main>
   );
+}
+
+function DistributorChip() {
+  const { data } = useMyDistributor(true);
+  if (!data) return null;
+  return <p className="mt-2 text-sm text-muted-foreground">تابع للموزع: <b className="text-foreground">{data}</b></p>;
 }
 
 function Status({ status, onRefresh }: { status: string; onRefresh: () => void }) {
@@ -94,9 +103,12 @@ function Orders() {
 function Auth() {
   const [mode, setMode] = useState<"in" | "up">("up");
   const [busy, setBusy] = useState(false);
+  const [ref] = useState(() => (typeof window === "undefined" ? "" : readRef()));
+  const { data: distName } = useDistributorName(ref);
   return (
     <main className="mx-auto max-w-sm px-4 py-12">
       <h1 className="text-center text-3xl font-black">{mode === "up" ? "تسجيل عيادة جديدة" : "تسجيل الدخول"}</h1>
+      {mode === "up" && distName && <p className="mt-3 rounded-xl bg-secondary p-3 text-center text-sm font-bold">تسجّل عبر الموزع: {distName}</p>}
       {mode === "up" && <p className="mt-2 text-center text-sm text-muted-foreground">بعد التسجيل تراجع الإدارة حسابك. يمكنك تجهيز السلة خلال ذلك.</p>}
       <form
         className="mt-6 space-y-3"
@@ -115,7 +127,7 @@ function Auth() {
                 email, password,
                 options: {
                   emailRedirectTo: `${window.location.origin}/account`,
-                  data: { clinic_name: String(f.get("clinic_name")), phone: String(f.get("phone")), address: String(f.get("address")) },
+                  data: { clinic_name: String(f.get("clinic_name")), phone: String(f.get("phone")), address: String(f.get("address")), ...(ref ? { ref } : {}) },
                 },
               });
           setBusy(false);

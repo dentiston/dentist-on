@@ -10,6 +10,7 @@ import { useCart } from "@/lib/cart";
 import { useCustomer } from "@/lib/customer";
 import { AskMaterial } from "@/components/AskMaterial";
 import { OrderTracker } from "@/components/OrderTracker";
+import { ExtraRequestsSection } from "@/components/ServiceRequests";
 import { PHONE_PATTERN, orderMessage, useWaNumber, waLink } from "@/lib/store";
 import { useShopConfig } from "@/lib/config";
 import { fmt } from "@/lib/products";
@@ -180,6 +181,7 @@ function CartPage() {
           </form>
         </div>
       )}
+      <ExtraRequestsSection />
       <OrderTracker approved={canOrder} />
     </main>
   );

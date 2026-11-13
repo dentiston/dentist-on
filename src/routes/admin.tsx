@@ -14,6 +14,7 @@ import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
 import { ChangePassword, MaterialRequests, Team, useNewRequests } from "@/components/AdminExtras";
+import { BundlesAdmin, CustomerDistributor, DistributorsAdmin, ServiceRequestsAdmin, UsedItemsAdmin, useDistributors, useHubCounts } from "@/components/AdminHub";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/admin")({
 
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 
-const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "rate", "team"] as const;
+const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "bundles", "distributors", "used", "services", "rate", "team"] as const;
 type Tab = (typeof ALL_TABS)[number];
 
 function AdminPage() {
@@ -96,7 +97,8 @@ function Dashboard({ email, staff, perms }: { email: string; staff: boolean; per
   const { data: orders = [] } = useQuery(ordersQuery);
   const { data: customers = [] } = useQuery({ ...customersQuery, enabled: !staff });
   const { data: newReq = 0 } = useNewRequests(!staff || perms.includes("requests"));
-  const badge = (t: string) => t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : t === "requests" ? newReq : 0;
+  const { data: hub } = useHubCounts(!staff);
+  const badge = (t: string) => t === "used" ? (hub?.used ?? 0) : t === "services" ? (hub?.services ?? 0) : t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : t === "requests" ? newReq : 0;
   useEffect(() => {
     const ch = supabase.channel("admin-alerts")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "customers" }, (p) => {
@@ -122,12 +124,12 @@ function Dashboard({ email, staff, perms }: { email: string; staff: boolean; per
       <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", rate: "الإعدادات" } as const)[t]}
+            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", bundles: "العروض والبكجات", distributors: "الموزعون", used: "المستعمل", services: "طلبات إضافية وصيانة", rate: "الإعدادات" } as const)[t]}
             {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
+      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : tab === "bundles" ? <BundlesAdmin /> : tab === "distributors" ? <DistributorsAdmin /> : tab === "used" ? <UsedItemsAdmin /> : tab === "services" ? <ServiceRequestsAdmin /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
     </main>
   );
 }
@@ -377,10 +379,14 @@ function RateSettings() {
   );
 }
 
+const did = (c: unknown) => (c as { distributor_id?: string | null }).distributor_id;
+
 function Customers({ readOnly = false }: { readOnly?: boolean }) {
   const qc = useQueryClient();
   const { data = [], isLoading } = useQuery(customersQuery);
   const label = { pending: "بانتظار الموافقة", approved: "مفعّل", rejected: "مرفوض" } as const;
+  const { data: dists = [] } = useDistributors(!readOnly);
+  const distName = (id?: string | null) => dists.find((d) => d.id === id)?.name;
   const sorted = [...data].sort((a, b) => Number(b.status === "pending") - Number(a.status === "pending"));
   const setStatus = async (c: Customer, status: Customer["status"]) => {
     const { error } = await supabase.from("customers").update({ status, approved_at: status === "approved" ? new Date().toISOString() : null }).eq("user_id", c.user_id);
@@ -403,6 +409,7 @@ function Customers({ readOnly = false }: { readOnly?: boolean }) {
               <div className="font-bold">{c.clinic_name}</div>
               <div className="text-sm text-muted-foreground" dir="ltr">{c.phone}</div>
               <div className="text-sm text-muted-foreground">{c.address}</div>
+              {distName(did(c)) && <div className="text-sm">الموزع: <b>{distName(did(c))}</b></div>}
               <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString("ar")}</div>
             </div>
             <span className={`rounded-full px-3 py-1 text-xs font-bold ${c.status === "pending" ? "bg-accent text-accent-foreground" : "bg-muted"}`}>{label[c.status]}</span>
@@ -419,6 +426,7 @@ function Customers({ readOnly = false }: { readOnly?: boolean }) {
                   }} />
               </label>
             )}
+            <CustomerDistributor userId={c.user_id} current={did(c)} />
             {c.status !== "approved" && <button onClick={() => setStatus(c, "approved")} className="rounded-full bg-primary px-5 py-2 text-sm font-bold text-primary-foreground">موافقة</button>}
             {c.status === "pending" && <button onClick={() => setStatus(c, "rejected")} className="rounded-full bg-muted px-5 py-2 text-sm">رفض</button>}
             {c.status === "approved" && (
