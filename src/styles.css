@@ -288,3 +288,33 @@
 @media (prefers-reduced-motion: reduce) {
   .hub-switch, .hub-switch-knob, .hub-panel, .hub-overlay, .hub-tile { transition-duration: 1ms; animation: none !important; }
 }
+
+/* ===== تفاعل المتجر: ظهور البطاقات، إضاءة اللمس، شرائح التصنيف، اقتراحات البحث ===== */
+.reveal { opacity: 0; transform: translateY(18px) scale(.97); transition: opacity 450ms ease, transform 450ms cubic-bezier(.2,.9,.3,1.1); }
+.reveal.is-in { opacity: 1; transform: none; transition-delay: calc(var(--i, 0) * 60ms); }
+
+.card-spot { --mx: 50%; --my: 0%; }
+.card-spot::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 250ms ease;
+  background: radial-gradient(180px circle at var(--mx) var(--my), color-mix(in oklch, var(--accent) 22%, transparent), transparent 70%);
+}
+.card-spot:hover::after { opacity: 1; }
+
+.pill-bar {
+  position: absolute; top: 0; left: 0; height: 100%; border-radius: 9999px; background: var(--primary);
+  transition: transform 320ms cubic-bezier(.2,.9,.3,1.1), width 320ms cubic-bezier(.2,.9,.3,1.1);
+}
+
+.suggest-pop { animation: suggest-pop 160ms ease-out both; transform-origin: top; }
+@keyframes suggest-pop { from { opacity: 0; transform: translateY(-6px) scale(.98); } to { opacity: 1; transform: none; } }
+
+.gallery-img { animation: gallery-in 280ms ease-out both; will-change: transform; }
+@keyframes gallery-in { from { opacity: .3; } to { opacity: 1; } }
+
+.progress-pop { animation: progress-pop 420ms cubic-bezier(.2,.9,.3,1.4) both; }
+@keyframes progress-pop { from { transform: scale(.8); opacity: 0; } to { transform: none; opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .pill-bar, .suggest-pop, .gallery-img, .progress-pop { transition-duration: 1ms !important; animation: none !important; }
+}
