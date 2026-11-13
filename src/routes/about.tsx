@@ -60,7 +60,7 @@ function AboutPage() {
       <h2 className="mt-10 text-2xl font-black">تواصل معنا</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <a href={supportLink()} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-[#25D366] px-4 py-3 font-bold text-black"><MessageCircle className="h-5 w-5" /><span>الشكاوى والدعم<span className="block text-xs" dir="ltr">{SUPPORT_PHONE}</span></span></a>
-        <a href={ordersLink("طلب مباشر / متابعة طلب")} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-[#25D366] px-4 py-3 font-bold text-black"><MessageCircle className="h-5 w-5" /><span>طلب مباشر · متابعة · صيانة<span className="block text-xs" dir="ltr">{ORDERS_PHONE}</span></span></a>
+        <a href={ordersLink("طلب مباشر / متابعة طلب")} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-[#25D366] px-4 py-3 font-bold text-black"><MessageCircle className="h-5 w-5" /><span>طلب مباشر · متابعة الطلب<span className="block text-xs" dir="ltr">{ORDERS_PHONE}</span></span></a>
       </div>
     </main>
   );

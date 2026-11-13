@@ -41,6 +41,29 @@ export const Route = createFileRoute("/product/$id")({
         ...(img ? [{ property: "og:image", content: img }] : []),
         { name: "twitter:card", content: img ? "summary_large_image" : "summary" },
       ],
+      // بيانات منتج منظمة: يظهر السعر والتوفر تحت المنتج في نتائج غوغل
+      scripts: p
+        ? [{
+            type: "application/ld+json",
+            children: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Product",
+              name: p.name,
+              description: desc,
+              ...(img ? { image: [img] } : {}),
+              ...(p.brand ? { brand: { "@type": "Brand", name: p.brand } } : {}),
+              category: p.category,
+              offers: {
+                "@type": "Offer",
+                url: SITE_URL ? `${SITE_URL}/product/${params.id}` : undefined,
+                priceCurrency: "USD",
+                price: Number(p.price).toFixed(2),
+                availability: p.stock != null && p.stock <= 0 ? "https://schema.org/OutOfStock" : "https://schema.org/InStock",
+                itemCondition: "https://schema.org/NewCondition",
+              },
+            }).replace(/</g, "\\u003c"),
+          }]
+        : [],
     };
   },
   component: ProductPage,
