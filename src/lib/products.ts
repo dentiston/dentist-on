@@ -18,6 +18,8 @@ export type Product = {
   stock?: number | null;
   images?: string[] | null; // صور إضافية بعد الصورة الرئيسية
   created_at?: string;
+  bundle_items?: { id: string; qty: number }[] | null; // الباقات: مكوّناتها
+  audience?: string | null; // students | clinics | all
 };
 
 export const categories = ["الكل", "أدوات يدوية", "مواد ترميمية", "قبضات وأجهزة", "تعقيم ووقاية"];

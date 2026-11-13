@@ -1,11 +1,28 @@
 import { useCallback, useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+import { sb } from "@/lib/db";
+import { clearRef, readRef } from "@/lib/referral";
 
 export type Customer = {
   user_id: string; clinic_name: string; phone: string; address: string;
   status: "pending" | "approved" | "rejected"; created_at: string; discount_percent?: number | null;
+  distributor_id?: string | null;
 };
+
+// ربط الطبيب بموزعه مرة واحدة (الكود محفوظ من الرابط، أو من بيانات التسجيل إن فُتح التأكيد من جهاز آخر)
+const attaching = new Map<string, Promise<void>>();
+async function attachRef(s: Session) {
+  const code = readRef() || String(s.user.user_metadata?.["ref"] ?? "").toUpperCase();
+  if (!code) return;
+  if (!attaching.has(s.user.id)) {
+    attaching.set(s.user.id, (async () => {
+      const { error } = await sb.rpc("attach_distributor", { p_code: code });
+      if (!error) clearRef();
+    })().finally(() => setTimeout(() => attaching.delete(s.user.id), 5000)));
+  }
+  await attaching.get(s.user.id);
+}
 
 // آخر بيانات للزبون (الخصم وحالة الحساب) لعرض السلة بشكل صحيح دون اتصال
 const CK = "dentist-on-customer";
@@ -29,6 +46,7 @@ export function useCustomer() {
       setLoading(false);
       return;
     }
+    await attachRef(s).catch(() => {});
     const { data, error } = await supabase.from("customers").select("*").eq("user_id", s.user.id).maybeSingle();
     if (error) {
       setCustomer(readCachedCustomer(s.user.id));
