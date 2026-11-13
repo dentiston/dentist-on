@@ -4,6 +4,7 @@ import { configQuery } from "@/lib/config";
 import { promosQuery } from "@/lib/promos";
 import { rateQuery } from "@/lib/rate";
 import { waQuery } from "@/lib/store";
+import { aboutQuery } from "@/lib/about";
 import { bestSellersQuery } from "@/lib/extras";
 import {
   ASSET_CACHE, OFFLINE_CACHE, extractAssetUrls, extractFontCssUrls, extractFontFileUrls, writeMeta, type OfflineMeta,
@@ -41,11 +42,12 @@ export async function downloadStore(qc: QueryClient, onProgress: Progress): Prom
     qc.fetchQuery({ ...promosQuery, ...strict }),
     qc.fetchQuery({ ...rateQuery, ...strict }),
     qc.fetchQuery({ ...waQuery, ...strict }),
+    qc.fetchQuery({ ...aboutQuery, ...strict }).catch(() => undefined), // قبل تنفيذ SQL الدفعة 5 لا يفشل التنزيل
     qc.fetchQuery({ ...bestSellersQuery, ...strict }),
   ]);
 
   // 2) الصفحات
-  const pages = ["/", "/cart", "/account", "/track", ...products.slice(0, MAX_PRODUCT_PAGES).map((p) => `/product/${encodeURIComponent(p.id)}`)];
+  const pages = ["/", "/cart", "/account", "/track", "/offers", "/about", ...products.slice(0, MAX_PRODUCT_PAGES).map((p) => `/product/${encodeURIComponent(p.id)}`)];
   const refs = new Set<string>();
   const fontCss = new Set<string>();
   let pagesOk = 0;

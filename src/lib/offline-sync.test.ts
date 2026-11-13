@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { diffCart, isPending, mergeMax, sameCart, setPendingFlag } from "./cart-sync";
+import { diffCart, isPending, mergeMax, needsSyncConfirm, sameCart, setPendingFlag } from "./cart-sync";
 import { cached, extractAssetUrls, extractFontCssUrls, extractFontFileUrls, readMeta, writeMeta } from "./offline";
 
 beforeEach(() => localStorage.clear());
@@ -22,6 +22,21 @@ describe("مزامنة السلة", () => {
     expect(isPending()).toBe(true);
     setPendingFlag(false);
     expect(isPending()).toBe(false);
+  });
+});
+
+describe("زر تأكيد المزامنة (الحالتان)", () => {
+  const base = { loggedIn: true, online: true, pending: true, serverCart: { a: 1 } };
+  it("دون اتصال: لا يظهر الزر حتى مع تغييرات معلّقة", () => {
+    expect(needsSyncConfirm({ ...base, online: false })).toBe(false);
+  });
+  it("عودة الاتصال مع تغييرات معلّقة وسلة حساب: يظهر", () => {
+    expect(needsSyncConfirm(base)).toBe(true);
+  });
+  it("لا يظهر لزائر، ولا بلا تغييرات، ولا قبل وصول سلة الحساب", () => {
+    expect(needsSyncConfirm({ ...base, loggedIn: false })).toBe(false);
+    expect(needsSyncConfirm({ ...base, pending: false })).toBe(false);
+    expect(needsSyncConfirm({ ...base, serverCart: null })).toBe(false);
   });
 });
 

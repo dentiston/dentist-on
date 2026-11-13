@@ -46,3 +46,7 @@ export const setPendingFlag = (on: boolean) => {
     else localStorage.removeItem(PENDING_KEY);
   } catch { /* التخزين غير متاح */ }
 };
+
+// متى يظهر زر «تأكيد مزامنة السلة»: مسجّل دخول + عاد الاتصال + توجد تغييرات معلّقة + وصلت سلة الحساب
+export const needsSyncConfirm = (st: { loggedIn: boolean; online: boolean; pending: boolean; serverCart: Cart | null }) =>
+  st.loggedIn && st.online && st.pending && !!st.serverCart;
