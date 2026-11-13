@@ -10,6 +10,7 @@ import { WatchButton } from "@/components/WatchButton";
 import { useCart } from "@/lib/cart";
 import { useDiscounts } from "@/lib/promos";
 import { SITE_URL } from "@/lib/store";
+import { flyToCart } from "@/lib/fx";
 import { LogoLoader } from "@/components/LogoLoader";
 
 export const Route = createFileRoute("/product/$id")({
@@ -107,7 +108,7 @@ function ProductPage() {
               <span className="w-8 text-center font-bold">{qty}</span>
               <button className="px-4 py-2 text-lg" onClick={() => setQty(Math.min(qty + 1, max))}>+</button>
             </div>
-            <button onClick={() => { add(p.id, qty); toast.success("أُضيف إلى السلة"); }} className="flex-1 rounded-full bg-primary py-3 font-bold text-primary-foreground">
+            <button onClick={() => { add(p.id, qty); flyToCart(document.querySelector("[data-fly-src]")); toast.success("أُضيف إلى السلة"); }} className="flex-1 rounded-full bg-primary py-3 font-bold text-primary-foreground">
               أضف للسلة — <Price usd={unitPrice(p, qty, pct) * qty} usdToo={false} />
             </button>
           </div>

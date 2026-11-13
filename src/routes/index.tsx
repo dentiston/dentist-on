@@ -1,16 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
 import { Search, Truck, BadgePercent, ShieldCheck, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { smartSearch } from "@/lib/search.functions";
 import { useOnline } from "@/lib/use-online";
 import hero from "@/assets/hero.jpg";
-import { categories, useProducts, type Product } from "@/lib/products";
+import { categories, imgSrc, unitPrice, useProducts, type Product } from "@/lib/products";
 import { defaultHome, useShopConfig } from "@/lib/config";
 import { useDiscounts } from "@/lib/promos";
 import { FirstOpenSuggest, PreviousItems } from "@/components/PreviousItems";
-import { ProductCard } from "@/components/ProductCard";
-import { LogoLoader } from "@/components/LogoLoader";
+import { ProductCard, ProductGridSkeleton } from "@/components/ProductCard";
+import { Price } from "@/components/Price";
 import { WatchAvailable } from "@/components/WatchAvailable";
 import { useBestSellers } from "@/lib/extras";
 
@@ -28,6 +28,30 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+// شرائح التصنيف: خلفية الشريحة المختارة تنزلق بين الشرائح
+function CategoryPills({ cats, cat, setCat }: { cats: string[]; cat: string; setCat: (c: string) => void }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const [bar, setBar] = useState<{ x: number; w: number } | null>(null);
+  const key = cats.join("|");
+  useEffect(() => {
+    const el = wrap.current?.querySelector<HTMLElement>("[aria-pressed=true]");
+    if (!el) return;
+    setBar({ x: el.offsetLeft, w: el.offsetWidth });
+    el.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [cat, key]);
+  return (
+    <div className="mt-4 overflow-x-auto pb-2">
+      <div ref={wrap} className="relative flex w-max gap-2">
+        {bar && <span aria-hidden className="pill-bar" style={{ width: bar.w, transform: `translateX(${bar.x}px)` }} />}
+        {cats.map((c) => (
+          <button key={c} onClick={() => setCat(c)} aria-pressed={cat === c}
+            className={`relative z-10 shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors duration-300 ${cat === c ? (bar ? "text-primary-foreground" : "bg-primary text-primary-foreground") : "bg-muted"}`}>{c}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   const [cat, setCat] = useState("الكل");
   const [q, setQ] = useState("");
@@ -36,6 +60,7 @@ function Index() {
   const [maxPrice, setMaxPrice] = useState("");
   const [smart, setSmart] = useState<{ q: string; ids: string[] } | null>(null);
   const [smartBusy, setSmartBusy] = useState(false);
+  const [focus, setFocus] = useState(false);
   const online = useOnline();
   const best = useBestSellers().data ?? {};
   const { data: products = [], isLoading } = useProducts();
@@ -58,6 +83,7 @@ function Index() {
       : sort === "new" ? String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
       : sort === "low" ? Number(a.price) - Number(b.price)
       : sort === "high" ? Number(b.price) - Number(a.price) : 0);
+  const suggestions = norm.length >= 2 ? products.filter((p) => [p.name, p.brand].some((t) => (t ?? "").toLowerCase().includes(norm))).slice(0, 5) : [];
   const runSmart = async () => {
     const text = q.trim();
     if (text.length < 3 || smartBusy) return;
@@ -108,7 +134,7 @@ function Index() {
         <section className="mx-auto max-w-6xl px-4 pt-10">
           <h2 className="text-2xl font-black">منتجات مميزة</h2>
           <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {featured.map((p) => <ProductCard key={p.id} p={p} pct={pctFor(p)} />)}
+            {featured.map((p, k) => <ProductCard key={p.id} p={p} pct={pctFor(p)} i={k} />)}
           </div>
         </section>
       )}
@@ -119,18 +145,28 @@ function Index() {
           <form className="flex gap-2 md:w-[26rem]" onSubmit={(e) => { e.preventDefault(); void runSmart(); }}>
             <div className="relative flex-1">
               <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <input value={q} onChange={(e) => { setQ(e.target.value); if (smart) setSmart(null); }} placeholder="ابحث، أو صِف ما تحتاجه (مثال: مادة لحشو ضرس بلون السن)" className="w-full rounded-full border border-input bg-card py-2 pr-9 pl-4 outline-none focus:border-accent" />
+              <input value={q} onChange={(e) => { setQ(e.target.value); if (smart) setSmart(null); }} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} onKeyDown={(e) => { if (e.key === "Escape") setFocus(false); }} autoComplete="off" placeholder="ابحث، أو صِف ما تحتاجه (مثال: مادة لحشو ضرس بلون السن)" className="w-full rounded-full border border-input bg-card py-2 pr-9 pl-4 outline-none focus:border-accent" />
+              {focus && suggestions.length > 0 && (
+                <ul onMouseDown={(e) => e.preventDefault()} className="suggest-pop absolute inset-x-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-border bg-card shadow-xl">
+                  {suggestions.map((p) => (
+                    <li key={p.id}>
+                      <Link to="/product/$id" params={{ id: p.id }} className="flex items-center gap-3 px-3 py-2 transition hover:bg-muted">
+                        <img src={imgSrc(p.image)} alt="" width={40} height={40} className="h-10 w-10 shrink-0 rounded-lg bg-muted object-cover" />
+                        <span className="min-w-0 flex-1"><span className="block truncate text-sm font-bold">{p.name}</span><span className="block text-xs text-muted-foreground">{p.brand}</span></span>
+                        <Price usd={unitPrice(p, 1)} usdToo={false} className="shrink-0 text-sm font-black" />
+                      </Link>
+                    </li>
+                  ))}
+                  <li className="border-t border-border px-3 py-2 text-center text-xs text-muted-foreground">{list.length} نتيجة في القائمة أدناه</li>
+                </ul>
+              )}
             </div>
             <button type="submit" disabled={smartBusy || q.trim().length < 3} className="flex shrink-0 items-center gap-1 rounded-full bg-accent px-4 text-sm font-bold text-accent-foreground disabled:opacity-50">
               <Sparkles className="h-4 w-4" /> {smartBusy ? "…" : "بحث ذكي"}
             </button>
           </form>
         </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
-          {cats.map((c) => (
-            <button key={c} onClick={() => setCat(c)} className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition ${cat === c ? "bg-primary text-primary-foreground" : "bg-muted"}`}>{c}</button>
-          ))}
-        </div>
+        <CategoryPills cats={cats} cat={cat} setCat={setCat} />
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
           <select value={brand} onChange={(e) => setBrand(e.target.value)} aria-label="الماركة" className="rounded-xl border border-input bg-card px-3 py-2 text-sm">
             <option value="">كل الماركات</option>
@@ -145,7 +181,7 @@ function Index() {
           </select>
           <input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="أقصى سعر $" aria-label="أقصى سعر" className="col-span-2 rounded-xl border border-input bg-card px-3 py-2 text-sm sm:col-span-1" dir="ltr" />
         </div>
-        {isLoading && <LogoLoader label="جارِ تحميل المنتجات…" />}
+        {isLoading && <ProductGridSkeleton />}
         {smartList && (
           <div className="mt-6 rounded-2xl border border-accent bg-card p-4">
             <div className="flex items-center justify-between gap-3">
@@ -159,8 +195,8 @@ function Index() {
             )}
           </div>
         )}
-        <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          {list.map((p) => <ProductCard key={p.id} p={p} pct={pctFor(p)} />)}
+        <div key={`${cat}|${brand}|${sort}|${max}`} className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          {list.map((p, k) => <ProductCard key={p.id} p={p} pct={pctFor(p)} i={k} />)}
         </div>
         {!isLoading && list.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد نتائج</p>}
       </section>
