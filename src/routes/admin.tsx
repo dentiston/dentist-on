@@ -14,7 +14,7 @@ import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
 import { ChangePassword, MaterialRequests, Team, useNewRequests } from "@/components/AdminExtras";
-import { BundlesAdmin, CustomerDistributor, DistributorsAdmin, ServiceRequestsAdmin, UsedItemsAdmin, useDistributors, useHubCounts } from "@/components/AdminHub";
+import { AboutEditor, ReviewsAdmin, BundlesAdmin, CustomerDistributor, DistributorsAdmin, ServiceRequestsAdmin, UsedItemsAdmin, useDistributors, useHubCounts } from "@/components/AdminHub";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -33,7 +33,7 @@ export const Route = createFileRoute("/admin")({
 
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 
-const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "bundles", "distributors", "used", "services", "rate", "team"] as const;
+const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "bundles", "distributors", "used", "services", "reviews", "rate", "team"] as const;
 type Tab = (typeof ALL_TABS)[number];
 
 function AdminPage() {
@@ -124,12 +124,12 @@ function Dashboard({ email, staff, perms }: { email: string; staff: boolean; per
       <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
         {tabs.map((t) => (
           <button key={t} onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", bundles: "العروض والبكجات", distributors: "الموزعون", used: "المستعمل", services: "طلبات إضافية وصيانة", rate: "الإعدادات" } as const)[t]}
+            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", bundles: "العروض والبكجات", distributors: "الموزعون", used: "المستعمل", services: "طلبات إضافية وصيانة", reviews: "التقييمات", rate: "الإعدادات" } as const)[t]}
             {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
           </button>
         ))}
       </div>
-      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : tab === "bundles" ? <BundlesAdmin /> : tab === "distributors" ? <DistributorsAdmin /> : tab === "used" ? <UsedItemsAdmin /> : tab === "services" ? <ServiceRequestsAdmin /> : <><RateSettings /><ShopRules /><NotifySettings /></>}
+      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : tab === "bundles" ? <BundlesAdmin /> : tab === "distributors" ? <DistributorsAdmin /> : tab === "used" ? <UsedItemsAdmin /> : tab === "services" ? <ServiceRequestsAdmin /> : tab === "reviews" ? <ReviewsAdmin /> : <><RateSettings /><ShopRules /><AboutEditor /><NotifySettings /></>}
     </main>
   );
 }

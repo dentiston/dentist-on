@@ -1,3 +1,4 @@
+import { ProductReviews } from "@/components/ProductReviews";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -58,6 +59,7 @@ function ProductPage() {
   const out = soldOut(p);
   const max = p.stock ?? Infinity;
   return (
+    <>
     <main className="mx-auto grid max-w-6xl gap-8 px-4 py-10 md:grid-cols-2">
       <Gallery p={p} />
       <div>
@@ -90,5 +92,7 @@ function ProductPage() {
         <div className="mt-4"><ShareButton id={p.id} name={p.name} /></div>
       </div>
     </main>
+    <ProductReviews productId={p.id} />
+    </>
   );
 }

@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { Search, Truck, BadgePercent, ShieldCheck } from "lucide-react";
+import { Search, Truck, BadgePercent, ShieldCheck, Sparkles, X } from "lucide-react";
+import { toast } from "sonner";
+import { smartSearch } from "@/lib/search.functions";
+import { useOnline } from "@/lib/use-online";
 import hero from "@/assets/hero.jpg";
 import { categories, useProducts, type Product } from "@/lib/products";
 import { defaultHome, useShopConfig } from "@/lib/config";
@@ -31,6 +34,9 @@ function Index() {
   const [brand, setBrand] = useState("");
   const [sort, setSort] = useState<"default" | "best" | "new" | "low" | "high">("default");
   const [maxPrice, setMaxPrice] = useState("");
+  const [smart, setSmart] = useState<{ q: string; ids: string[] } | null>(null);
+  const [smartBusy, setSmartBusy] = useState(false);
+  const online = useOnline();
   const best = useBestSellers().data ?? {};
   const { data: products = [], isLoading } = useProducts();
   const { data: cfg } = useShopConfig();
@@ -52,6 +58,19 @@ function Index() {
       : sort === "new" ? String(b.created_at ?? "").localeCompare(String(a.created_at ?? ""))
       : sort === "low" ? Number(a.price) - Number(b.price)
       : sort === "high" ? Number(b.price) - Number(a.price) : 0);
+  const runSmart = async () => {
+    const text = q.trim();
+    if (text.length < 3 || smartBusy) return;
+    if (!online) { toast.error("البحث الذكي يحتاج اتصالاً بالإنترنت"); return; }
+    setSmartBusy(true);
+    try {
+      const r = await smartSearch({ data: { q: text } });
+      if (r.ok) setSmart({ q: text, ids: r.ids });
+      else toast.error(r.reason === "busy" ? "البحث الذكي مشغول الآن، جرّب بعد قليل" : "البحث الذكي غير متاح حالياً، استخدم البحث العادي");
+    } catch { toast.error("تعذّر البحث الذكي، استخدم البحث العادي"); }
+    setSmartBusy(false);
+  };
+  const smartList = smart ? smart.ids.map((id) => products.find((p) => p.id === id && p.active)).filter((p): p is Product => !!p) : null;
   return (
     <main>
       {home.announcement.enabled && home.announcement.text.trim() && (
@@ -97,10 +116,15 @@ function Index() {
       <section id="shop" className="mx-auto max-w-6xl px-4 py-12">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <h2 className="text-2xl font-black">المنتجات</h2>
-          <div className="relative md:w-72">
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث عن منتج أو ماركة..." className="w-full rounded-full border border-input bg-card py-2 pr-9 pl-4 outline-none focus:border-accent" />
-          </div>
+          <form className="flex gap-2 md:w-[26rem]" onSubmit={(e) => { e.preventDefault(); void runSmart(); }}>
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <input value={q} onChange={(e) => { setQ(e.target.value); if (smart) setSmart(null); }} placeholder="ابحث، أو صِف ما تحتاجه (مثال: مادة لحشو ضرس بلون السن)" className="w-full rounded-full border border-input bg-card py-2 pr-9 pl-4 outline-none focus:border-accent" />
+            </div>
+            <button type="submit" disabled={smartBusy || q.trim().length < 3} className="flex shrink-0 items-center gap-1 rounded-full bg-accent px-4 text-sm font-bold text-accent-foreground disabled:opacity-50">
+              <Sparkles className="h-4 w-4" /> {smartBusy ? "…" : "بحث ذكي"}
+            </button>
+          </form>
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
           {cats.map((c) => (
@@ -122,6 +146,19 @@ function Index() {
           <input type="number" min="0" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} placeholder="أقصى سعر $" aria-label="أقصى سعر" className="col-span-2 rounded-xl border border-input bg-card px-3 py-2 text-sm sm:col-span-1" dir="ltr" />
         </div>
         {isLoading && <LogoLoader label="جارِ تحميل المنتجات…" />}
+        {smartList && (
+          <div className="mt-6 rounded-2xl border border-accent bg-card p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-black"><Sparkles className="ml-1 inline h-4 w-4 text-accent" />نتائج البحث الذكي عن «{smart!.q}» ({smartList.length})</div>
+              <button onClick={() => setSmart(null)} aria-label="إغلاق النتائج الذكية" className="grid h-8 w-8 place-items-center rounded-full bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            {smartList.length === 0 ? (
+              <p className="mt-3 text-sm text-muted-foreground">لم نجد في كتالوج المتجر ما يطابق وصفك. جرّب وصفاً آخر، أو اطلب المادة من «اسأل عن مادة».</p>
+            ) : (
+              <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-4">{smartList.map((p) => <ProductCard key={p.id} p={p} pct={pctFor(p)} />)}</div>
+            )}
+          </div>
+        )}
         <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-4">
           {list.map((p) => <ProductCard key={p.id} p={p} pct={pctFor(p)} />)}
         </div>

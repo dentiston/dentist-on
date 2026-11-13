@@ -148,7 +148,7 @@ function RootComponent() {
         <AskMaterial />
         <SideHub />
         <OfflineManager />
-        <footer className="mt-10 border-t border-border py-8 text-center text-sm text-muted-foreground">© Dentist On — For Dental Material</footer>
+        <footer className="mt-10 border-t border-border py-8 text-center text-sm text-muted-foreground"><Link to="/about" className="font-bold underline">من نحن والتوصيل</Link><div className="mt-2">© Dentist On — For Dental Material</div></footer>
         <Toaster position="top-center" theme={dark ? "dark" : "light"} />
       </CartProvider>
     </QueryClientProvider>
