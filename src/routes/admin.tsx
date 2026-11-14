@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Pencil, Trash2, Plus, LogOut } from "lucide-react";
+import { Pencil, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAdmin } from "@/lib/auth";
 import { categories, fmt, imgSrc, unitPrice, useProducts, type Product } from "@/lib/products";
@@ -14,6 +14,9 @@ import { approvalMessage, reminderMessage, statusMessage, waLinkTo } from "@/lib
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { Customer } from "@/lib/customer";
 import { ChangePassword, MaterialRequests, Team, useNewRequests } from "@/components/AdminExtras";
+import { AdminShell } from "@/components/AdminShell";
+import { AdminOverview } from "@/components/AdminOverview";
+import { AdminCards } from "@/components/AdminCards";
 import { AboutEditor, ReviewsAdmin, BundlesAdmin, CustomerDistributor, DistributorsAdmin, ServiceRequestsAdmin, UsedItemsAdmin, useDistributors, useHubCounts } from "@/components/AdminHub";
 
 export const Route = createFileRoute("/admin")({
@@ -33,7 +36,7 @@ export const Route = createFileRoute("/admin")({
 
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 
-const ALL_TABS = ["orders", "requests", "customers", "carts", "promos", "home", "products", "bundles", "distributors", "used", "services", "reviews", "rate", "team"] as const;
+const ALL_TABS = ["hub", "overview", "orders", "requests", "customers", "carts", "promos", "home", "products", "bundles", "distributors", "used", "services", "reviews", "rate", "team"] as const;
 type Tab = (typeof ALL_TABS)[number];
 
 function AdminPage() {
@@ -92,13 +95,30 @@ function Login() {
 
 function Dashboard({ email, staff, perms }: { email: string; staff: boolean; perms: string[] }) {
   const qc = useQueryClient();
-  const tabs: readonly Tab[] = staff ? ALL_TABS.filter((t) => (t === "orders" || t === "requests" || t === "customers") && perms.includes(t)) : ALL_TABS;
-  const [tab, setTab] = useState<Tab>(tabs[0] ?? "orders");
+  const tabs: readonly Tab[] = staff ? ALL_TABS.filter((t) => t === "hub" || ((t === "orders" || t === "requests" || t === "customers") && perms.includes(t))) : ALL_TABS;
+  const fromHash = (): Tab => {
+    const h = typeof window === "undefined" ? "" : window.location.hash.slice(1);
+    return (tabs as readonly string[]).includes(h) ? (h as Tab) : (tabs[0] ?? "orders");
+  };
+  const [tab, setTabState] = useState<Tab>(fromHash);
+  // القسم الحالي يُحفظ في الرابط (#orders): يعمل زر الرجوع ويبقى القسم بعد التحديث
+  useEffect(() => {
+    const on = () => setTabState(fromHash());
+    window.addEventListener("hashchange", on);
+    return () => window.removeEventListener("hashchange", on);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staff, perms.join()]);
+  const go = (t: string) => { if ((tabs as readonly string[]).includes(t)) { window.location.hash = t; setTabState(t as Tab); } };
   const { data: orders = [] } = useQuery(ordersQuery);
   const { data: customers = [] } = useQuery({ ...customersQuery, enabled: !staff });
   const { data: newReq = 0 } = useNewRequests(!staff || perms.includes("requests"));
   const { data: hub } = useHubCounts(!staff);
-  const badge = (t: string) => t === "used" ? (hub?.used ?? 0) : t === "services" ? (hub?.services ?? 0) : t === "orders" ? orders.filter((o) => o.status === "جديد").length : t === "customers" ? customers.filter((c) => c.status === "pending").length : t === "requests" ? newReq : 0;
+  const badges: Record<string, number> = {
+    used: hub?.used ?? 0, services: hub?.services ?? 0,
+    orders: orders.filter((o) => o.status === "جديد").length,
+    customers: customers.filter((c) => c.status === "pending").length,
+    requests: newReq,
+  };
   useEffect(() => {
     const ch = supabase.channel("admin-alerts")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "customers" }, (p) => {
@@ -113,23 +133,10 @@ function Dashboard({ email, staff, perms }: { email: string; staff: boolean; per
     return () => { supabase.removeChannel(ch); };
   }, [qc]);
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-black">لوحة المدير</h1>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
-          <span dir="ltr">{email}</span>
-          <button onClick={() => supabase.auth.signOut()} aria-label="خروج"><LogOut className="h-4 w-4" /></button>
-        </div>
-      </div>
-      <div className="mt-6 flex gap-2 overflow-x-auto pb-1">
-        {tabs.map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`shrink-0 rounded-full px-4 py-2 font-bold ${tab === t ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
-            {({ orders: "الطلبات", requests: "طلبات التوفر", team: "الفريق والسجل", customers: "العملاء", carts: "سلال متروكة", promos: "الخصومات", home: "الصفحة الرئيسية", products: "المنتجات", bundles: "العروض والبكجات", distributors: "الموزعون", used: "المستعمل", services: "طلبات إضافية وصيانة", reviews: "التقييمات", rate: "الإعدادات" } as const)[t]}
-            {badge(t) > 0 && <span className="mr-1 rounded-full bg-accent px-2 text-xs text-accent-foreground">{badge(t)}</span>}
-          </button>
-        ))}
-      </div>
-      {tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : tab === "bundles" ? <BundlesAdmin /> : tab === "distributors" ? <DistributorsAdmin /> : tab === "used" ? <UsedItemsAdmin /> : tab === "services" ? <ServiceRequestsAdmin /> : tab === "reviews" ? <ReviewsAdmin /> : <><RateSettings /><ShopRules /><AboutEditor /><NotifySettings /></>}
+    <main>
+      <AdminShell items={[...tabs]} tab={tab} go={go} badges={badges} email={email} onSignOut={() => supabase.auth.signOut()} onRefresh={() => qc.invalidateQueries()}>
+        {tab === "hub" ? <AdminCards items={[...tabs]} badges={badges} go={go} canEdit={!staff} /> : tab === "overview" ? <AdminOverview orders={orders} badges={badges} statuses={statuses} go={go} /> : tab === "orders" ? <Orders staff={staff} /> : tab === "requests" ? <MaterialRequests /> : tab === "team" ? <Team /> : tab === "customers" ? <Customers readOnly={staff} /> : tab === "carts" ? <AbandonedCarts /> : tab === "promos" ? <Promotions /> : tab === "home" ? <HomeEditor /> : tab === "products" ? <Products /> : tab === "bundles" ? <BundlesAdmin /> : tab === "distributors" ? <DistributorsAdmin /> : tab === "used" ? <UsedItemsAdmin /> : tab === "services" ? <ServiceRequestsAdmin /> : tab === "reviews" ? <ReviewsAdmin /> : <><RateSettings /><ShopRules /><AboutEditor /><NotifySettings /></>}
+      </AdminShell>
     </main>
   );
 }
@@ -159,6 +166,10 @@ function Orders({ staff = false }: { staff?: boolean }) {
   const revenue = data.filter((o) => o.status !== "ملغي").reduce((s, o) => s + Number(o.total), 0);
   const unpaid = data.filter((o) => o.status !== "ملغي" && !o.paid).reduce((s, o) => s + Number(o.total), 0);
   const weeks = weeklyCounts(data);
+  const [fs, setFs] = useState("الكل");
+  const [oq, setOq] = useState("");
+  const nq = oq.trim().toLowerCase();
+  const shown = data.filter((o) => (fs === "الكل" || o.status === fs) && (!nq || [o.customer_name, o.phone, o.id, o.address].some((t) => String(t ?? "").toLowerCase().includes(nq))));
   return (
     <section className="mt-6">
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -171,8 +182,23 @@ function Orders({ staff = false }: { staff?: boolean }) {
       {isLoading && <p className="text-muted-foreground">جارِ التحميل…</p>}
       <WeeklyChart data={weeks} />
       {!isLoading && data.length === 0 && <p className="py-10 text-center text-muted-foreground">لا توجد طلبات بعد</p>}
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input value={oq} onChange={(e) => setOq(e.target.value)} placeholder="ابحث باسم الزبون أو الهاتف أو رقم الطلب…" className={`${input} sm:max-w-xs`} />
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {["الكل", ...statuses].map((s) => {
+            const n = s === "الكل" ? data.length : data.filter((o) => o.status === s).length;
+            return (
+              <button key={s} type="button" onClick={() => setFs(s)} aria-pressed={fs === s}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-bold transition active:scale-95 ${fs === s ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-secondary"}`}>
+                {s} <span className="opacity-70">{n}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {shown.length === 0 && data.length > 0 && <p className="py-8 text-center text-muted-foreground">لا طلبات تطابق التصفية</p>}
       <div className="space-y-3">
-        {data.map((o) => (
+        {shown.map((o) => (
           <div key={o.id} className="rounded-2xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
