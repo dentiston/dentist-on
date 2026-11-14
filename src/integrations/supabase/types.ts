@@ -118,27 +118,39 @@ export type Database = {
           code: string
           created_at: string
           id: string
+          invite_expires: string | null
+          invite_token: string | null
           name: string
           note: string
           phone: string
+          portal_email: string
+          user_id: string | null
         }
         Insert: {
           active?: boolean
           code: string
           created_at?: string
           id?: string
+          invite_expires?: string | null
+          invite_token?: string | null
           name: string
           note?: string
           phone?: string
+          portal_email?: string
+          user_id?: string | null
         }
         Update: {
           active?: boolean
           code?: string
           created_at?: string
           id?: string
+          invite_expires?: string | null
+          invite_token?: string | null
           name?: string
           note?: string
           phone?: string
+          portal_email?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -613,11 +625,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_create_distributor_invite: {
+        Args: { p_dist: string }
+        Returns: string
+      }
       admin_exists: { Args: never; Returns: boolean }
       admin_set_distributor: {
         Args: { p_dist: string; p_user: string }
         Returns: undefined
       }
+      admin_unlink_distributor: { Args: { p_dist: string }; Returns: undefined }
       ask_material: {
         Args: {
           p_brand: string
@@ -647,10 +664,34 @@ export type Database = {
           target: string
         }[]
       }
+      claim_distributor_invite: { Args: { p_token: string }; Returns: boolean }
       distributor_by_code: {
         Args: { p_code: string }
         Returns: {
           name: string
+        }[]
+      }
+      distributor_doctors: {
+        Args: never
+        Returns: {
+          clinic_name: string
+          created_at: string
+          last_order: string
+          orders_count: number
+          orders_total: number
+          phone: string
+          status: string
+          user_id: string
+        }[]
+      }
+      distributor_orders: {
+        Args: { p_limit?: number }
+        Returns: {
+          clinic_name: string
+          created_at: string
+          id: string
+          status: string
+          total: number
         }[]
       }
       has_perm: { Args: { _perm: string; _uid: string }; Returns: boolean }
@@ -667,6 +708,17 @@ export type Database = {
         Args: never
         Returns: {
           name: string
+        }[]
+      }
+      my_distributor_portal: {
+        Args: never
+        Returns: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          name: string
+          phone: string
         }[]
       }
       notify_admin: {
