@@ -6,6 +6,7 @@ import { sb } from "@/lib/db";
 import { fmt, imgSrc, useProducts, type Product } from "@/lib/products";
 import { AUDIENCES, BUNDLE_CATEGORY, bundleValue, isBundle, type Audience, type BundleItem } from "@/lib/bundles";
 import { genCode, normCode, refLink, refMessage } from "@/lib/referral";
+import { inviteLink, portalMessage } from "@/lib/distributor";
 import { waLinkTo } from "@/lib/store";
 import { SERVICE_STATUSES } from "@/components/ServiceRequests";
 import { defaultAbout, useAbout, type AboutConfig } from "@/lib/about";
@@ -16,7 +17,7 @@ import type { Review } from "@/lib/reviews";
 const input = "w-full rounded-xl border border-input bg-card px-3 py-2";
 const btn = "rounded-full px-4 py-1.5 text-sm font-bold";
 
-type Dist = { id: string; name: string; phone: string; code: string; note: string; active: boolean; created_at: string };
+type Dist = { id: string; name: string; phone: string; code: string; note: string; active: boolean; created_at: string; user_id?: string | null; portal_email?: string; invite_token?: string | null; invite_expires?: string | null };
 export const useDistributors = (enabled = true) =>
   useQuery({
     queryKey: ["distributors"], enabled,
@@ -101,6 +102,7 @@ export function DistributorsAdmin() {
               </div>
             </div>
             <div className="mt-2 break-all rounded-xl bg-muted px-3 py-2 text-xs" dir="ltr">{link}</div>
+            <PortalLinker d={d} onDone={refresh} />
             <div className="mt-3 flex flex-wrap gap-2">
               <button onClick={() => copy(link)} className={`${btn} bg-primary text-primary-foreground`}>نسخ الرابط</button>
               <a href={waLinkTo(d.phone, refMessage(d.name, link))} target="_blank" rel="noreferrer" className={`${btn} bg-accent text-accent-foreground`}>أرسل الرابط للموزع (واتساب)</a>
@@ -128,6 +130,56 @@ export function DistributorsAdmin() {
         );
       })}
     </section>
+  );
+}
+
+// بوابة الموزع: لا يصير أحد موزعاً إلا برابط دعوة تولّده أنت هنا (لمرة واحدة، صالح 7 أيام)
+function PortalLinker({ d, onDone }: { d: Dist; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const live = !!d.invite_token && !!d.invite_expires && new Date(d.invite_expires).getTime() > Date.now();
+  const err = (m: string) => toast.error(m.includes("function") ? "نفّذ supabase-changes-5.sql أولاً" : m.includes("already_linked") ? "الموزع مربوط بحساب بالفعل" : m);
+  const create = async () => {
+    setBusy(true);
+    const { error } = await sb.rpc("admin_create_distributor_invite", { p_dist: d.id });
+    setBusy(false);
+    if (error) { err(error.message); return; }
+    toast.success("تم إنشاء رابط الدعوة"); onDone();
+  };
+  const unlink = async (msg: string) => {
+    if (!confirm(msg)) return;
+    setBusy(true);
+    const { error } = await sb.rpc("admin_unlink_distributor", { p_dist: d.id });
+    setBusy(false);
+    if (error) { err(error.message); return; }
+    toast.success("تم"); onDone();
+  };
+  const url = live ? inviteLink(d.invite_token!) : "";
+  return (
+    <div className="mt-3 rounded-xl border border-dashed border-border p-3 text-sm">
+      <div className="font-bold">بوابة الموزع {d.user_id ? <span className="mr-1 rounded-full bg-accent px-2 py-0.5 text-xs text-accent-foreground">مفعّلة ✓</span> : live ? <span className="mr-1 rounded-full bg-muted px-2 py-0.5 text-xs">بانتظار تفعيل الموزع</span> : <span className="mr-1 rounded-full bg-muted px-2 py-0.5 text-xs">لا دعوة</span>}</div>
+      {d.user_id ? (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground" dir="ltr">{d.portal_email}</span>
+          <button disabled={busy} onClick={() => void unlink("فصل حساب هذا الموزع؟ سيفقد الدخول للبوابة.")} className={`${btn} bg-muted`}>فصل الحساب</button>
+        </div>
+      ) : live ? (
+        <div className="mt-2 space-y-2">
+          <div className="break-all rounded-xl bg-muted px-3 py-2 text-xs" dir="ltr">{url}</div>
+          <p className="text-xs text-muted-foreground">يعمل مرة واحدة فقط ويُغلق بعد التفعيل. ينتهي {new Date(d.invite_expires!).toLocaleDateString("ar")}.</p>
+          <div className="flex flex-wrap gap-2">
+            <a href={waLinkTo(d.phone, portalMessage(d.name, d.invite_token!))} target="_blank" rel="noreferrer" className={`${btn} bg-accent text-accent-foreground`}>أرسل الدعوة (واتساب)</a>
+            <button onClick={() => { void navigator.clipboard.writeText(url).then(() => toast.success("تم نسخ الرابط")); }} className={`${btn} bg-muted`}>نسخ الرابط</button>
+            <button disabled={busy} onClick={() => void create()} className={`${btn} bg-muted`}>رابط جديد</button>
+            <button disabled={busy} onClick={() => void unlink("إلغاء هذه الدعوة؟")} className={`${btn} bg-muted`}>إلغاء الدعوة</button>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-2">
+          <p className="text-xs text-muted-foreground">لا يستطيع أحد إنشاء حساب موزع بنفسه. أنشئ رابط دعوة وأرسله للموزع ليفتح حسابه.</p>
+          <button disabled={busy || !d.active} onClick={() => void create()} className={`${btn} bg-primary text-primary-foreground disabled:opacity-50`}>إنشاء رابط دعوة</button>
+        </div>
+      )}
+    </div>
   );
 }
 
