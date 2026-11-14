@@ -16,5 +16,6 @@ Disallow: /admin
 Disallow: /cart
 Disallow: /account
 Disallow: /track
+Disallow: /distributor
 
 Sitemap: https://dentist-on.lovable.app/sitemap.xml
